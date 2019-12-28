@@ -1,0 +1,6 @@
+python >=3.7
+h5py
+numba
+numpy
+pandas
+scipy
