@@ -1,10 +1,10 @@
 import h5py
 import numpy as np
-import pandas as pd
 
 from pyclone_vi.data import load_data
 
 import pyclone_vi.inference
+import pyclone_vi.post_process
 
 
 def fit(
@@ -25,7 +25,7 @@ def fit(
     if seed is not None:
         np.random.seed(seed)
 
-    log_p_data, mutation_ids = load_data(in_file, density, num_grid_points, precision=precision)
+    log_p_data, mutations, samples = load_data(in_file, density, num_grid_points, precision=precision)
 
     priors = pyclone_vi.inference.get_priors(num_clusters, num_grid_points)
 
@@ -66,9 +66,16 @@ def fit(
 
     with h5py.File(out_file, 'w') as fh:
         fh.create_dataset(
-            '/data/mutation_ids',
-            data=np.array(mutation_ids, dtype=h5py.string_dtype(encoding='utf-8'))
+            '/data/mutations',
+            data=np.array(mutations, dtype=h5py.string_dtype(encoding='utf-8'))
         )
+
+        fh.create_dataset(
+            '/data/samples',
+            data=np.array(samples, dtype=h5py.string_dtype(encoding='utf-8'))
+        )
+
+        fh.create_dataset('/data/log_p', data=log_p_data)
 
         fh.create_dataset('/priors/pi', data=priors.pi)
 
@@ -83,24 +90,13 @@ def fit(
         fh.create_dataset('/stats/elbo', data=np.array(elbo_trace))
 
 
-def write_cluster_file(in_file, out_file):
-    with h5py.File(in_file, 'r') as fh:
-        m = fh['/data/mutation_ids'][()]
+def write_results_file(in_file, out_file, compress=False):
+    df = pyclone_vi.post_process.load_results_df(in_file)
 
-        z = fh['/var_params/z'][()]
+    df = pyclone_vi.post_process.fix_cluster_ids(df)
 
-    clusters = np.argmax(z, axis=1)
+    if compress:
+        df.to_csv(out_file, compression='gzip', float_format='%.4f', index=False, sep='\t')
 
-    df = pd.DataFrame({
-        'mutation_id': m,
-        'cluster': clusters,
-        'cluster_prob': np.max(z, axis=1)
-    })
-
-    cluster_map = dict(zip(
-        df['cluster'].unique(), np.arange(df['cluster'].nunique())
-    ))
-
-    df['cluster'] = df['cluster'].map(cluster_map)
-
-    df.to_csv(out_file, index=False, sep='\t')
+    else:
+        df.to_csv(out_file, float_format='%.4f', index=False, sep='\t')

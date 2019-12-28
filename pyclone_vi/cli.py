@@ -108,7 +108,7 @@ def fit(**kwargs):
 
 @click.command(
     context_settings={'max_content_width': 120},
-    name='write-cluster-file'
+    name='write-results-file'
 )
 @click.option(
     '-i', '--in-file',
@@ -123,10 +123,15 @@ def fit(**kwargs):
     type=click.Path(resolve_path=True),
     help='''Path to where results will be written in HDF5 format.'''
 )
-def write_cluster_file(**kwargs):
-    """ Write the most probable cluster assignments of a fitted model to file.
+@click.option(
+    '-c', '--compress',
+    is_flag=True,
+    help='''If set the output file will be compressed using gzip.'''
+)
+def write_results_file(**kwargs):
+    """ Write the results of a fitted model to file.
     """
-    pyclone_vi.run.write_cluster_file(**kwargs)
+    pyclone_vi.run.write_results_file(**kwargs)
 
 
 @click.group(name='pyclone-vi')
@@ -135,4 +140,4 @@ def main():
 
 
 main.add_command(fit)
-main.add_command(write_cluster_file)
+main.add_command(write_results_file)

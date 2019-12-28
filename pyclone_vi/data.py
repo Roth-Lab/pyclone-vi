@@ -8,7 +8,7 @@ from pyclone_vi.math_utils import log_beta_binomial_pdf, log_binomial_pdf, log_n
 
 
 def load_data(file_name, density='binomial', num_grid_points=100, precision=200):
-    data = load_pyclone_data(file_name)
+    data, mutations, samples = load_pyclone_data(file_name)
 
     log_p_data = []
 
@@ -17,7 +17,7 @@ def load_data(file_name, density='binomial', num_grid_points=100, precision=200)
             data_point.to_likelihood_grid(density, num_grid_points, precision=precision)
         )
 
-    return np.stack(log_p_data), list(data.keys())
+    return np.stack(log_p_data), mutations, samples
 
 
 def load_pyclone_data(file_name):
@@ -75,7 +75,7 @@ def load_pyclone_data(file_name):
 
         data[name] = DataPoint(samples, sample_data_points)
 
-    return data
+    return data, mutations, samples
 
 
 def get_major_cn_prior(major_cn, minor_cn, normal_cn, error_rate=1e-3):
