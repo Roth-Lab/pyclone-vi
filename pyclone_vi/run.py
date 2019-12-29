@@ -15,7 +15,7 @@ def fit(
         annealing_power=1.0,
         max_iters=int(1e4),
         mix_weight_prior=1.0,
-        num_annealing_steps=None,
+        num_annealing_steps=1,
         num_clusters=10,
         num_grid_points=100,
         precision=200,
@@ -38,27 +38,16 @@ def fit(
         log_p_data.shape[2]
     )
 
-    if num_annealing_steps is None:
-        elbo_trace = pyclone_vi.inference.fit(
-            log_p_data,
-            priors,
-            var_params,
-            convergence_threshold=convergence_threshold,
-            max_iters=max_iters,
-            print_freq=print_freq
-        )
-
-    else:
-        elbo_trace = pyclone_vi.inference.fit_annealed(
-            log_p_data,
-            priors,
-            var_params,
-            annealing_power=annealing_power,
-            convergence_threshold=convergence_threshold,
-            max_iters=max_iters,
-            num_annealing_steps=num_annealing_steps,
-            print_freq=print_freq
-        )
+    elbo_trace = pyclone_vi.inference.fit_annealed(
+        log_p_data,
+        priors,
+        var_params,
+        annealing_power=annealing_power,
+        convergence_threshold=convergence_threshold,
+        max_iters=max_iters,
+        num_annealing_steps=num_annealing_steps,
+        print_freq=print_freq
+    )
 
     print('Fitting completed')
     print('Final ELBO: {}'.format(elbo_trace[-1]))

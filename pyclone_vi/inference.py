@@ -18,7 +18,11 @@ def fit_annealed(
         num_annealing_steps=10,
         print_freq=100):
 
-    annealing_ladder = np.linspace(0, 1.0, num_annealing_steps) ** annealing_power
+    if num_annealing_steps == 1:
+        annealing_ladder = [1.0]
+
+    else:
+        annealing_ladder = np.linspace(0, 1.0, num_annealing_steps) ** annealing_power
 
     for t in annealing_ladder:
         print('Setting annealing factor to : {}'.format(t))

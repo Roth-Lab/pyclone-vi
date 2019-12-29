@@ -22,10 +22,10 @@ import pyclone_vi.run
 )
 @click.option(
     '-a', '--num-annealing-steps',
-    default=None,
+    default=1,
     type=int,
     help='''Number of simulated annealing steps to use.'''
-    '''Default is to not use simulated annealing.'''
+    '''Default is one step i.e. not to use simulated annealing.'''
 )
 @click.option(
     '-c', '--num-clusters',
