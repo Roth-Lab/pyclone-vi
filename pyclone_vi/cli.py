@@ -51,6 +51,13 @@ import pyclone_vi.run
     '''Default is 100.'''
 )
 @click.option(
+    '-r', '--num-restarts',
+    default=1,
+    type=int,
+    help='''Number random restarts of Variational inference.'''
+    '''Default is 1.'''
+)
+@click.option(
     '--annealing-power',
     default=1.0,
     type=float,

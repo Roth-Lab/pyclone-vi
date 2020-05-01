@@ -18,6 +18,7 @@ def fit(
         num_annealing_steps=1,
         num_clusters=10,
         num_grid_points=100,
+        num_restarts=1,
         precision=200,
         print_freq=100,
         seed=None):
@@ -27,27 +28,44 @@ def fit(
 
     log_p_data, mutations, samples = load_data(in_file, density, num_grid_points, precision=precision)
 
-    priors = pyclone_vi.inference.get_priors(num_clusters, num_grid_points)
+    restart_results = []
 
-    priors.pi = np.ones(num_clusters) * mix_weight_prior
+    for i in range(num_restarts):
+        priors = pyclone_vi.inference.get_priors(num_clusters, num_grid_points)
 
-    var_params = pyclone_vi.inference.get_variational_params(
-        len(priors.pi),
-        log_p_data.shape[0],
-        log_p_data.shape[1],
-        log_p_data.shape[2]
-    )
+        priors.pi = np.ones(num_clusters) * mix_weight_prior
 
-    elbo_trace = pyclone_vi.inference.fit_annealed(
-        log_p_data,
-        priors,
-        var_params,
-        annealing_power=annealing_power,
-        convergence_threshold=convergence_threshold,
-        max_iters=max_iters,
-        num_annealing_steps=num_annealing_steps,
-        print_freq=print_freq
-    )
+        var_params = pyclone_vi.inference.get_variational_params(
+            len(priors.pi),
+            log_p_data.shape[0],
+            log_p_data.shape[1],
+            log_p_data.shape[2]
+        )
+
+        elbo_trace = pyclone_vi.inference.fit_annealed(
+            log_p_data,
+            priors,
+            var_params,
+            annealing_power=annealing_power,
+            convergence_threshold=convergence_threshold,
+            max_iters=max_iters,
+            num_annealing_steps=num_annealing_steps,
+            print_freq=print_freq
+        )
+
+        restart_results.append((elbo_trace, var_params))
+
+    best_idx = 0
+
+    best_elbo = restart_results[0][0][-1]
+
+    for i in range(num_restarts):
+        if restart_results[i][0][-1] > best_elbo:
+            best_idx = i
+
+            best_elbo = restart_results[i][0][-1]
+
+    elbo_trace, var_params = restart_results[best_idx]
 
     print('Fitting completed')
     print('Final ELBO: {}'.format(elbo_trace[-1]))
