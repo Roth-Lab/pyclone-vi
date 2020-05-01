@@ -171,7 +171,7 @@ def update_z(log_p_data, var_params):
 
 
 def update_theta(log_p_data, priors, var_params):
-    var_params.theta = priors.theta[np.newaxis, np.newaxis, :] + compute_log_p_data_z(log_p_data, var_params.z)
+    var_params.theta = np.log(priors.theta[np.newaxis, np.newaxis, :]) + compute_log_p_data_z(log_p_data, var_params.z)
 
     var_params.theta = var_params.theta - log_sum_exp(var_params.theta, axis=2)[:, :, np.newaxis]
 
