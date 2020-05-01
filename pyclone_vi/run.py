@@ -31,6 +31,8 @@ def fit(
     restart_results = []
 
     for i in range(num_restarts):
+        print('Performing restart {}'.format(i))
+
         priors = pyclone_vi.inference.get_priors(num_clusters, num_grid_points)
 
         priors.pi = np.ones(num_clusters) * mix_weight_prior
