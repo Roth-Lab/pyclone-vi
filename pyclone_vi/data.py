@@ -23,6 +23,13 @@ def load_data(file_name, density='binomial', num_grid_points=100, precision=200)
 def load_pyclone_data(file_name):
     df = pd.read_csv(file_name, sep='\t')
 
+    num_dels = sum(df["major_cn"] == 0)
+
+    if num_dels > 0:
+        print("Removing {} mutations with major copy number zero".format(num_dels))
+
+    df = df[df["major_cn"] > 0]
+
     df['sample_id'] = df['sample_id'].astype(str)
 
     samples = sorted(df['sample_id'].unique())
