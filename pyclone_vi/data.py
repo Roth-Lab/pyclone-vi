@@ -99,7 +99,7 @@ def load_pyclone_data(file_name):
 
     print('Num mutations: {}'.format(len(data)))
 
-    return data, data.keys(), samples
+    return data, list(data.keys()), samples
 
 
 def get_major_cn_prior(major_cn, minor_cn, normal_cn, error_rate=1e-3):
