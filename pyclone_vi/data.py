@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import defaultdict, OrderedDict
 
 import numba
 import numpy as np
@@ -23,25 +23,19 @@ def load_data(file_name, density='binomial', num_grid_points=100, precision=200)
 def load_pyclone_data(file_name):
     df = pd.read_csv(file_name, sep='\t')
 
-    num_dels = sum(df["major_cn"] == 0)
+    num_dels = sum(df['major_cn'] == 0)
 
     if num_dels > 0:
-        print("Removing {} mutations with major copy number zero".format(num_dels))
+        print('Removing {} mutations with major copy number zero'.format(num_dels))
 
-    df = df[df["major_cn"] > 0]
+    df = df[df['major_cn'] > 0]
 
     df['sample_id'] = df['sample_id'].astype(str)
 
     samples = sorted(df['sample_id'].unique())
 
     # Filter for mutations present in all samples
-    df = df.groupby(by='mutation_id').filter(lambda x: sorted(x['sample_id'].unique()) == samples)
-
     mutations = sorted(df['mutation_id'].unique())
-
-    print('Samples: {}'.format(' '.join(samples)))
-
-    print('Num mutations: {}'.format(len(mutations)))
 
     if 'error_rate' not in df.columns:
         df.loc[:, 'error_rate'] = 1e-3
@@ -53,36 +47,59 @@ def load_pyclone_data(file_name):
 
     print()
 
-    data = OrderedDict()
+    # Preload all possible CN genotypes in the data
+    cn_priors = {}
 
-    for name in mutations:
-        mut_df = df[df['mutation_id'] == name]
+    prior_keys = ['major_cn', 'minor_cn', 'normal_cn', 'error_rate']
 
-        sample_data_points = []
+    for row in df[prior_keys].drop_duplicates().itertuples(index=False):
+        cn_priors[tuple(row)] = get_major_cn_prior(
+            row.major_cn,
+            row.minor_cn,
+            row.normal_cn,
+            error_rate=row.error_rate
+        )
 
-        mut_df = mut_df.set_index('sample_id')
+    # Load the sample data points
+    sample_data_points = defaultdict(list)
 
-        for sample in samples:
-            row = mut_df.loc[sample]
+    for sample in samples:
+        sample_df = df[df['sample_id'] == sample]
+
+        sample_df = sample_df.set_index('mutation_id')
+
+        for i, name in enumerate(sample_df.index):
+            row = sample_df.loc[name]
 
             a = row['ref_counts']
 
             b = row['alt_counts']
 
-            cn, mu, log_pi = get_major_cn_prior(
+            cn, mu, log_pi = cn_priors[(
                 row['major_cn'],
                 row['minor_cn'],
                 row['normal_cn'],
-                error_rate=row['error_rate']
-            )
+                row['error_rate']
+            )]
 
-            sample_data_points.append(
+            sample_data_points[name].append(
                 SampleDataPoint(a, b, cn, mu, log_pi, row['tumour_content'])
             )
 
-        data[name] = DataPoint(samples, sample_data_points)
+    # Create final data point objects
+    data = OrderedDict()
 
-    return data, mutations, samples
+    for name in mutations:
+        if len(sample_data_points[name]) != len(samples):
+            continue
+
+        data[name] = DataPoint(samples, sample_data_points[name])
+
+    print('Samples: {}'.format(' '.join(samples)))
+
+    print('Num mutations: {}'.format(len(data)))
+
+    return data, data.keys(), samples
 
 
 def get_major_cn_prior(major_cn, minor_cn, normal_cn, error_rate=1e-3):
@@ -140,13 +157,14 @@ class DataPoint(object):
 
         log_ll = np.zeros(shape)
 
-        for s_idx, data_point in enumerate(self.sample_data_points):
-            for i, ccf in enumerate(self.get_ccf_grid(num_grid_points)):
-                if density == 'beta-binomial':
-                    log_ll[s_idx, i] = log_pyclone_beta_binomial_pdf(data_point, ccf, precision)
+        grid = self.get_ccf_grid(num_grid_points)
 
-                elif density == 'binomial':
-                    log_ll[s_idx, i] = log_pyclone_binomial_pdf(data_point, ccf)
+        for s_idx, data_point in enumerate(self.sample_data_points):
+            if density == 'beta-binomial':
+                log_ll[s_idx] = log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision)
+
+            elif density == 'binomial':
+                log_ll[s_idx] = log_pyclone_binomial_pdf_grid(data_point, grid)
 
         return log_ll
 
@@ -167,6 +185,26 @@ class SampleDataPoint(object):
         self.mu = mu
         self.log_pi = log_pi
         self.t = t
+
+
+@numba.jit(nopython=True)
+def log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision):
+    log_ll = np.zeros(grid.shape)
+
+    for i, ccf in enumerate(grid):
+        log_ll[i] = log_pyclone_beta_binomial_pdf(data_point, ccf, precision)
+
+    return log_ll
+
+
+@numba.jit(nopython=True)
+def log_pyclone_binomial_pdf_grid(data_point, grid):
+    log_ll = np.zeros(grid.shape)
+
+    for i, ccf in enumerate(grid):
+        log_ll[i] = log_pyclone_binomial_pdf(data_point, ccf)
+
+    return log_ll
 
 
 @numba.jit(nopython=True)
