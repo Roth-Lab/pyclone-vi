@@ -59,11 +59,11 @@ def fit(log_p_data, priors, var_params, convergence_threshold=1e-6, max_iters=in
             print('Number of clusters used: {}'.format(num_clusters))
             print()
 
+        update_z(log_p_data, var_params)
+
         update_pi(priors, var_params)
 
         update_theta(log_p_data, priors, var_params)
-
-        update_z(log_p_data, var_params)
 
         elbo_trace.append(
             compute_elbo(log_p_data, priors, var_params)
