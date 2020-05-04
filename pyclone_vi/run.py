@@ -28,7 +28,9 @@ def fit(
 
     log_p_data, mutations, samples = load_data(in_file, density, num_grid_points, precision=precision)
 
-    restart_results = []
+    best_elbo = np.float("-inf")
+
+    result = None
 
     for i in range(num_restarts):
         print('Performing restart {}'.format(i))
@@ -55,21 +57,19 @@ def fit(
             print_freq=print_freq
         )
 
-        restart_results.append((elbo_trace, var_params))
+        if elbo_trace[-1] > best_elbo:
+            best_elbo = elbo_trace[-1]
 
-    best_idx = 0
+            result = (elbo_trace, var_params)
 
-    best_elbo = restart_results[0][0][-1]
+        print('Fitting completed')
+        print('ELBO: {}'.format(elbo_trace[-1]))
+        print('Number of clusters used: {}'.format(len(set(var_params.z.argmax(axis=1)))))
+        print()
 
-    for i in range(num_restarts):
-        if restart_results[i][0][-1] > best_elbo:
-            best_idx = i
+    elbo_trace, var_params = result
 
-            best_elbo = restart_results[i][0][-1]
-
-    elbo_trace, var_params = restart_results[best_idx]
-
-    print('Fitting completed')
+    print('All restarts completed')
     print('Final ELBO: {}'.format(elbo_trace[-1]))
     print('Number of clusters used: {}'.format(len(set(var_params.z.argmax(axis=1)))))
 
