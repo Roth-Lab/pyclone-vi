@@ -72,36 +72,11 @@ Default value is 0.001 if column is not present.
 
 ### Running PyClone-VI
 
-PyClone-VI analyses are broken into two parts.
-First the model is fit using the `fit` command.
-Second the fitted model is post-processed and a results file produced using the `write-results-file` command.
-
-Sampling can be run as follows
-```
-phyclone run -i INPUT.tsv -t TRACE.pkl 
-``` 
-which will take the file `INPUT.tsv` as described above and write the trace file `TRACE.pkl` in a Python pickle format.
-
-The `-n` command can be used to control the number of iterations of sampling to perform.
-
-The `-b` command can be used to control the number of burnin iterations to perform.
-> Note: burnin is done using a heuristic strategy of unconditional SMC.
-All samples from the burnin are discarded as they will not target the posterior.
-
-The `-d` command can be used to select the emission density.
-As in PyClone the `binomial` and `beta-binomial` densities are available.
-> Note: Unlike PyClone, PhyClone does not estimate the precision parameter of the Beta-Binomial.
-This parameter can be set with the --precision flag.
-
-To build the final results of PhyClone you can run the `consensus` command as follows.
-```
-phyclone consensus -d INPUT.tsv -t TRACE.pkl -n TREE.nwk -o TABLE.tsv
-``` 
-where `INPUT.tsv` and `TRACE.pkl` are the same as the previous step and `TREE.nwk` is the clone tree in newick format and `TABLE.tsv` the assignment of mutations to clones.
+TODO
 
 # License
 
-PhyClone is licensed under the GPL v3, see the LICENSE.txt file for details.
+PyClone-VI is licensed under the GPL v3, see the LICENSE.txt file for details.
 
 # Versions
 
