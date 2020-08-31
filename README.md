@@ -47,7 +47,7 @@ This assumes you are running in the base directory of the git repo.
 Here we run allowing for up to 40 clusters (clones), using the Beta-Binomial distribution and performing 10 random restarts.
 This should take a under five minutes.
 ```
-pyclone-vi fit -i examples/tracerx.tsv -o tracerx.h5 -c 40 -d beta-binomial -r 100
+pyclone-vi fit -i examples/tracerx.tsv -o tracerx.h5 -c 40 -d beta-binomial -r 10
 ```
 
 3. Next we output the final results from the best random restart.
