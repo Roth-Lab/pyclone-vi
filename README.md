@@ -12,7 +12,7 @@ You can do this by installing [Miniconda](https://conda.io/miniconda.html)
 
 2. Install the required dependencies using conda.
 We will create a new `conda` environment with the dependencies.
-From inside the checked out PhyClone repository folder run the following.
+From inside the checked out PyClone-VI repository folder run the following.
 ```
 conda create -n pyclone-vi --file requirements.txt --yes
 ```
