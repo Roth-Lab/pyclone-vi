@@ -121,14 +121,13 @@ def fit(**kwargs):
     '-i', '--in-file',
     required=True,
     type=click.Path(exists=True, resolve_path=True),
-    help='''Path to TSV format file with copy number and allele count information for all samples.'''
-    '''See the examples directory in the GitHub repository for format.'''
+    help='''Path to HDF5 format file produced by the `fit` command.'''
 )
 @click.option(
     '-o', '--out-file',
     required=True,
     type=click.Path(resolve_path=True),
-    help='''Path to where results will be written in HDF5 format.'''
+    help='''Path to where results will be written in tsv format.'''
 )
 @click.option(
     '-c', '--compress',
