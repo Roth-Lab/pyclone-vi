@@ -169,7 +169,7 @@ class DataPoint(object):
         return log_ll
 
 
-@numba.jitclass([
+@numba.experimental.jitclass([
     ('a', numba.int64),
     ('b', numba.int64),
     ('cn', numba.int64[:, :]),
