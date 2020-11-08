@@ -25,12 +25,18 @@ source activate pyclone-vi
 
 4. Install PyClone-VI
 ```
-pip install git+ssh://git@github.com/aroth85/pyclone-vi.git
+pip install git+https://github.com/Roth-Lab/pyclone-vi.git
 ```
 
 5. If everything worked PyClone-VI should be available on the command line.
 ```
 pyclone-vi --help
+```
+
+## Troubleshooting
+If step 4 fails, try installing from the setup.py from within the pyclone-vi folder
+```
+python setup.py install
 ```
 
 ## Usage
