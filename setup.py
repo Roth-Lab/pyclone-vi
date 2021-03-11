@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='pyclone-vi',
-    version='0.1.0',
+    version='0.1.1',
     description='Fast method for inferring clonal population structure from SNV data.',
     author='Andrew Roth',
     author_email='andrewjlroth@gmail.com',
