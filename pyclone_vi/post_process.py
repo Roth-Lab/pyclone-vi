@@ -38,7 +38,7 @@ def load_results_df(file_name):
 
 def load_cluster_df(file_name):
     with h5py.File(file_name, 'r') as fh:
-        samples = fh['/data/samples'][()]
+        samples = fh['/data/samples'].asstr()[()]
 
         theta = fh['/var_params/theta'][()]
 
@@ -78,7 +78,7 @@ def load_cluster_df(file_name):
 
 def load_loci_df(file_name):
     with h5py.File(file_name, 'r') as fh:
-        mutations = fh['/data/mutations'][()]
+        mutations = fh['/data/mutations'].asstr()[()]
 
         z = fh['/var_params/z'][()]
 
