@@ -54,7 +54,14 @@ import pyclone_vi.run
     '-r', '--num-restarts',
     default=1,
     type=int,
-    help='''Number random restarts of Variational inference.'''
+    help='''Number of random restarts of variational inference.'''
+    '''Default is 1.'''
+)
+@click.option(
+    '-t', '--num-threads',
+    default=1,
+    type=int,
+    help='''Number of threads to use.'''
     '''Default is 1.'''
 )
 @click.option(

@@ -1,5 +1,6 @@
 import h5py
 import numpy as np
+import numba
 
 from pyclone_vi.data import load_data
 
@@ -19,10 +20,13 @@ def fit(
         num_clusters=10,
         num_grid_points=100,
         num_restarts=1,
+        num_threads=1,
         precision=200,
         print_freq=100,
         seed=None):
-
+    
+    numba.set_num_threads(num_threads)
+    
     if seed is not None:
         np.random.seed(seed)
 
