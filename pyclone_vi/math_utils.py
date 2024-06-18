@@ -4,6 +4,7 @@ import numpy as np
 
 # Special functions
 
+
 @numba.njit
 def log_beta(a, b):
     return log_gamma(a) + log_gamma(b) - log_gamma(a + b)
@@ -45,6 +46,7 @@ def log_sum_exp(log_X):
 
 
 # Probability densities
+
 
 @numba.njit
 def log_beta_binomial_pdf(n, x, a, b):
