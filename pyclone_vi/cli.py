@@ -33,7 +33,7 @@ import pyclone_vi.run
     default=10,
     type=int,
     help="""Number of clusters to use in variational approximation distribution. """
-    """Note that not all clusters may not be assigned data points, so the final number of clusters could be lower."""
+    """Note that not all clusters may not be assigned data points, so the final number of clusters could be lower. """
     """Default is 10.""",
 )
 @click.option(
