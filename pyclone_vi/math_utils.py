@@ -1,5 +1,6 @@
 from numba import njit
 import numpy as np
+from math import lgamma
 
 
 # Special functions
@@ -22,7 +23,7 @@ def log_factorial(x):
 
 @njit(cache=True)
 def log_gamma(x):
-    return np.math.lgamma(x)
+    return lgamma(x)
 
 
 @njit(cache=True)
