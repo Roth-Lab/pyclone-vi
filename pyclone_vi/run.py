@@ -27,8 +27,6 @@ def fit(
 ):
     set_num_threads(num_threads)
 
-    # if seed is not None:
-    #     np.random.seed(seed)
     rng = instantiate_and_seed_RNG(seed)
 
     log_p_data, mutations, samples = load_data(
@@ -38,6 +36,8 @@ def fit(
     best_elbo = float("-inf")
 
     result = None
+
+    priors = None
 
     for i in range(num_restarts):
         print("Performing restart {}".format(i))
@@ -78,6 +78,10 @@ def fit(
     print("Final ELBO: {}".format(elbo_trace[-1]))
     print("Number of clusters used: {}".format(len(set(var_params.z.argmax(axis=1)))))
 
+    _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params)
+
+
+def _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params):
     with h5py.File(out_file, "w") as fh:
         fh.create_dataset(
             "/data/mutations",
