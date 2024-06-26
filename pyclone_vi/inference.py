@@ -1,6 +1,6 @@
 from scipy.special import gammaln as log_gamma, logsumexp as log_sum_exp, psi
 
-import numba
+from numba import njit, prange
 import numpy as np
 
 
@@ -179,7 +179,7 @@ def update_theta(log_p_data, priors, var_params):
     var_params.theta = np.exp(var_params.theta)
 
 
-@numba.njit(parallel=True)
+@njit(parallel=True, cache=True)
 def compute_log_p_data_z(log_p_data, z):
     """Equivalent to np.sum(var_params.z[:, :, np.newaxis, np.newaxis] * log_p_data[:, np.newaxis, :, :], axis=0)"""
     N, D, G = log_p_data.shape
@@ -188,7 +188,7 @@ def compute_log_p_data_z(log_p_data, z):
 
     result = np.zeros((K, D, G))
 
-    for k in numba.prange(K):
+    for k in prange(K):
         for d in range(D):
             for g in range(G):
                 for n in range(N):
@@ -197,7 +197,7 @@ def compute_log_p_data_z(log_p_data, z):
     return result
 
 
-@numba.njit(parallel=True)
+@njit(parallel=True, cache=True)
 def compute_log_p_data_theta(log_p_data, theta):
     """Equivalent to np.sum(var_params.theta[np.newaxis, :, :, :] * log_p_data[:, np.newaxis, :, :], axis=(2, 3))"""
     N, D, G = log_p_data.shape
@@ -206,7 +206,7 @@ def compute_log_p_data_theta(log_p_data, theta):
 
     result = np.zeros((N, K))
 
-    for n in numba.prange(N):
+    for n in prange(N):
         for k in range(K):
             for d in range(D):
                 for g in range(G):
