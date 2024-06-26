@@ -1,6 +1,6 @@
 import h5py
 import numpy as np
-import numba
+from numba import set_num_threads
 
 from pyclone_vi.data import load_data
 
@@ -25,10 +25,11 @@ def fit(
     print_freq=100,
     seed=None,
 ):
-    numba.set_num_threads(num_threads)
+    set_num_threads(num_threads)
 
-    if seed is not None:
-        np.random.seed(seed)
+    # if seed is not None:
+    #     np.random.seed(seed)
+    rng = instantiate_and_seed_RNG(seed)
 
     log_p_data, mutations, samples = load_data(
         in_file, density, num_grid_points, precision=precision
@@ -45,12 +46,8 @@ def fit(
 
         priors.pi = np.ones(num_clusters) * mix_weight_prior
 
-        var_params = pyclone_vi.inference.get_variational_params(
-            len(priors.pi),
-            log_p_data.shape[0],
-            log_p_data.shape[1],
-            log_p_data.shape[2],
-        )
+        var_params = pyclone_vi.inference.get_variational_params(len(priors.pi), log_p_data.shape[0],
+                                                                 log_p_data.shape[1], log_p_data.shape[2], rng)
 
         elbo_trace = pyclone_vi.inference.fit_annealed(
             log_p_data,
@@ -119,3 +116,11 @@ def write_results_file(in_file, out_file, compress=False):
 
     else:
         df.to_csv(out_file, float_format="%.4f", index=False, sep="\t")
+
+
+def instantiate_and_seed_RNG(seed):
+    if seed is not None:
+        rng = np.random.default_rng(seed)
+    else:
+        rng = np.random.default_rng()
+    return rng

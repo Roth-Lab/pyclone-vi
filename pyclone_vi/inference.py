@@ -84,11 +84,11 @@ def get_priors(num_clusters, num_grid_points):
     )
 
 
-def get_variational_params(num_clusters, num_data_points, num_dims, num_grid_points):
+def get_variational_params(num_clusters, num_data_points, num_dims, num_grid_points, rng):
     var_params = VariationalParameters(
-        np.random.dirichlet(np.ones(num_clusters)),
-        np.random.gamma(1, 1, size=(num_clusters, num_dims, num_grid_points)),
-        np.random.dirichlet(np.ones(num_clusters), size=num_data_points),
+        rng.dirichlet(np.ones(num_clusters)),
+        rng.gamma(1, 1, size=(num_clusters, num_dims, num_grid_points)),
+        rng.dirichlet(np.ones(num_clusters), size=num_data_points),
     )
 
     var_params.theta = (
