@@ -194,7 +194,7 @@ class SampleDataPoint(object):
         self.t = t
 
 
-@numba.njit
+@numba.njit(cache=True)
 def log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision):
     log_ll = np.zeros(grid.shape)
 
@@ -204,7 +204,7 @@ def log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision):
     return log_ll
 
 
-@numba.njit
+@numba.njit(cache=True)
 def log_pyclone_binomial_pdf_grid(data_point, grid):
     log_ll = np.zeros(grid.shape)
 
@@ -214,7 +214,7 @@ def log_pyclone_binomial_pdf_grid(data_point, grid):
     return log_ll
 
 
-@numba.njit
+@numba.njit(cache=True)
 def log_pyclone_beta_binomial_pdf(data, f, s):
     t = data.t
 
@@ -250,7 +250,7 @@ def log_pyclone_beta_binomial_pdf(data, f, s):
     return log_sum_exp(ll)
 
 
-@numba.njit
+@numba.njit(cache=True)
 def log_pyclone_binomial_pdf(data, f):
     t = data.t
 
