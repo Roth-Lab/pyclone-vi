@@ -11,6 +11,8 @@ from pyclone_vi.math_utils import (
     log_sum_exp,
 )
 
+from functools import lru_cache
+
 
 def load_data(file_name, density="binomial", num_grid_points=100, precision=200):
     data, mutations, samples = load_pyclone_data(file_name)
@@ -28,83 +30,130 @@ def load_data(file_name, density="binomial", num_grid_points=100, precision=200)
 def load_pyclone_data(file_name):
     df = pd.read_csv(file_name, sep="\t")
 
-    num_dels = sum(df["major_cn"] == 0)
+    df = _remove_cn_zero_mutations(df)
 
-    if num_dels > 0:
-        print("Removing {} mutations with major copy number zero".format(num_dels))
-
-    df = df[df["major_cn"] > 0]
-
-    df["sample_id"] = df["sample_id"].astype(str)
+    _process_required_columns(df)
 
     samples = sorted(df["sample_id"].unique())
+    samples_len = len(samples)
 
     # Filter for mutations present in all samples
+    df = df.loc[df.groupby("mutation_id")["sample_id"].transform("size") == samples_len]
     mutations = sorted(df["mutation_id"].unique())
 
-    if "error_rate" not in df.columns:
-        df.loc[:, "error_rate"] = 1e-3
+    data = _create_loaded_pyclone_data_dict(df, mutations, samples)
 
-    if "tumour_content" not in df.columns:
-        print("Tumour content column not found. Setting values to 1.0.")
+    get_major_cn_prior.cache_clear()
 
-        df.loc[:, "tumour_content"] = 1.0
-
-    print()
-
-    # Preload all possible CN genotypes in the data
-    cn_priors = {}
-
-    prior_keys = ["major_cn", "minor_cn", "normal_cn", "error_rate"]
-
-    for row in df[prior_keys].drop_duplicates().itertuples(index=False):
-        cn_priors[tuple(row)] = get_major_cn_prior(
-            row.major_cn, row.minor_cn, row.normal_cn, error_rate=row.error_rate
-        )
-
-    # Load the sample data points
-    sample_data_points = defaultdict(list)
-
-    for sample in samples:
-        sample_df = df[df["sample_id"] == sample]
-
-        sample_df = sample_df.set_index("mutation_id")
-
-        for i, name in enumerate(sample_df.index):
-            row = sample_df.loc[name]
-
-            a = row["ref_counts"]
-
-            b = row["alt_counts"]
-
-            cn, mu, log_pi = cn_priors[
-                (row["major_cn"], row["minor_cn"], row["normal_cn"], row["error_rate"])
-            ]
-
-            sample_data_points[name].append(
-                SampleDataPoint(a, b, cn, mu, log_pi, row["tumour_content"])
-            )
-
-    # Create final data point objects
-    data = OrderedDict()
-
-    for name in mutations:
-        if len(sample_data_points[name]) != len(samples):
-            continue
-
-        data[name] = DataPoint(samples, sample_data_points[name])
-
-    if len(samples) <= 20:
-        print("Samples: {}".format(" ".join(samples)))
-
+    # if len(samples) <= 20:
+    #     print("Samples: {}".format(" ".join(samples)))
+    #
+    # else:
+    #     print("Num samples: {}".format(len(samples)))
+    print("Num Samples: {}".format(len(samples)))
+    if len(samples) > 20:
+        print("Samples: {}...".format(" ".join(samples[:10])))
     else:
-        print("Num samples: {}".format(len(samples)))
+        print("Samples: {}".format(" ".join(samples)))
 
     print("Num mutations: {}".format(len(data)))
 
     return data, list(data.keys()), samples
 
 
+# def _create_loaded_pyclone_data_dict(df, mutations, samples):
+#     # Preload all possible CN genotypes in the data
+#     cn_priors = {}
+#     prior_keys = ["major_cn", "minor_cn", "normal_cn", "error_rate"]
+#     for row in df[prior_keys].drop_duplicates().itertuples(index=False):
+#         cn_priors[tuple(row)] = get_major_cn_prior(
+#             row.major_cn, row.minor_cn, row.normal_cn, error_rate=row.error_rate
+#         )
+#     # Load the sample data points
+#     sample_data_points = defaultdict(list)
+#     for sample in samples:
+#         sample_df = df[df["sample_id"] == sample]
+#
+#         sample_df = sample_df.set_index("mutation_id")
+#
+#         for i, name in enumerate(sample_df.index):
+#             row = sample_df.loc[name]
+#
+#             a = row["ref_counts"]
+#
+#             b = row["alt_counts"]
+#
+#             cn, mu, log_pi = cn_priors[
+#                 (row["major_cn"], row["minor_cn"], row["normal_cn"], row["error_rate"])
+#             ]
+#
+#             sample_data_points[name].append(
+#                 SampleDataPoint(a, b, cn, mu, log_pi, row["tumour_content"])
+#             )
+#     # Create final data point objects
+#     data = OrderedDict()
+#     for name in mutations:
+#         if len(sample_data_points[name]) != len(samples):
+#             continue
+#
+#         data[name] = DataPoint(samples, sample_data_points[name])
+#     return data
+
+
+def _create_loaded_pyclone_data_dict(df, mutations, samples):
+    data = OrderedDict()
+    df = df.sort_values(by="mutation_id", ascending=True)
+    grouped = df.groupby("mutation_id", sort=False)
+
+    for mutation, group in grouped:
+        sample_data_points = []
+
+        group.set_index("sample_id", inplace=True)
+
+        for sample in samples:
+
+            a = group.at[sample, "ref_counts"]
+
+            b = group.at[sample, "alt_counts"]
+
+            cn, mu, log_pi = get_major_cn_prior(
+                group.at[sample, "major_cn"],
+                group.at[sample, "minor_cn"],
+                group.at[sample, "normal_cn"],
+                error_rate=group.at[sample, "error_rate"],
+            )
+
+            sample_data_points.append(
+                SampleDataPoint(
+                    a, b, cn, mu, log_pi, group.at[sample, "tumour_content"]
+                )
+            )
+
+        data[mutation] = DataPoint(samples, sample_data_points)
+
+    return data
+
+
+def _process_required_columns(df):
+    df["sample_id"] = df["sample_id"].astype(str)
+    if "error_rate" not in df.columns:
+        df.loc[:, "error_rate"] = 1e-3
+    if "tumour_content" not in df.columns:
+        print("Tumour content column not found. Setting values to 1.0.")
+
+        df.loc[:, "tumour_content"] = 1.0
+    print()
+
+
+def _remove_cn_zero_mutations(df):
+    num_dels = sum(df["major_cn"] == 0)
+    if num_dels > 0:
+        print("Removing {} mutations with major copy number zero".format(num_dels))
+    df = df.loc[df["major_cn"] > 0]
+    return df
+
+
+@lru_cache(maxsize=1024)
 def get_major_cn_prior(major_cn, minor_cn, normal_cn, error_rate=1e-3):
     total_cn = major_cn + minor_cn
 
