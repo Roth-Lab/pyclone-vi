@@ -145,6 +145,7 @@ def write_results_file(**kwargs):
 
 
 @click.group(name="pyclone-vi")
+@click.version_option()
 def main():
     pass
 
