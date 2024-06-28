@@ -46,8 +46,13 @@ def fit(
 
         priors.pi = np.ones(num_clusters) * mix_weight_prior
 
-        var_params = pyclone_vi.inference.get_variational_params(len(priors.pi), log_p_data.shape[0],
-                                                                 log_p_data.shape[1], log_p_data.shape[2], rng)
+        var_params = pyclone_vi.inference.get_variational_params(
+            len(priors.pi),
+            log_p_data.shape[0],
+            log_p_data.shape[1],
+            log_p_data.shape[2],
+            rng,
+        )
 
         elbo_trace = pyclone_vi.inference.fit_annealed(
             log_p_data,
@@ -78,10 +83,14 @@ def fit(
     print("Final ELBO: {}".format(elbo_trace[-1]))
     print("Number of clusters used: {}".format(len(set(var_params.z.argmax(axis=1)))))
 
-    _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params)
+    _create_fit_results_file(
+        elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params
+    )
 
 
-def _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params):
+def _create_fit_results_file(
+    elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params
+):
     with h5py.File(out_file, "w") as fh:
         fh.create_dataset(
             "/data/mutations",
