@@ -1,4 +1,4 @@
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict
 
 import numba
 import numpy as np
@@ -39,17 +39,11 @@ def load_pyclone_data(file_name):
 
     # Filter for mutations present in all samples
     df = df.loc[df.groupby("mutation_id")["sample_id"].transform("size") == samples_len]
-    mutations = sorted(df["mutation_id"].unique())
 
-    data = _create_loaded_pyclone_data_dict(df, mutations, samples)
+    data = _create_loaded_pyclone_data_dict(df, samples)
 
     get_major_cn_prior.cache_clear()
 
-    # if len(samples) <= 20:
-    #     print("Samples: {}".format(" ".join(samples)))
-    #
-    # else:
-    #     print("Num samples: {}".format(len(samples)))
     print("Num Samples: {}".format(len(samples)))
     if len(samples) > 20:
         print("Samples: {}...".format(" ".join(samples[:10])))
@@ -61,46 +55,7 @@ def load_pyclone_data(file_name):
     return data, list(data.keys()), samples
 
 
-# def _create_loaded_pyclone_data_dict(df, mutations, samples):
-#     # Preload all possible CN genotypes in the data
-#     cn_priors = {}
-#     prior_keys = ["major_cn", "minor_cn", "normal_cn", "error_rate"]
-#     for row in df[prior_keys].drop_duplicates().itertuples(index=False):
-#         cn_priors[tuple(row)] = get_major_cn_prior(
-#             row.major_cn, row.minor_cn, row.normal_cn, error_rate=row.error_rate
-#         )
-#     # Load the sample data points
-#     sample_data_points = defaultdict(list)
-#     for sample in samples:
-#         sample_df = df[df["sample_id"] == sample]
-#
-#         sample_df = sample_df.set_index("mutation_id")
-#
-#         for i, name in enumerate(sample_df.index):
-#             row = sample_df.loc[name]
-#
-#             a = row["ref_counts"]
-#
-#             b = row["alt_counts"]
-#
-#             cn, mu, log_pi = cn_priors[
-#                 (row["major_cn"], row["minor_cn"], row["normal_cn"], row["error_rate"])
-#             ]
-#
-#             sample_data_points[name].append(
-#                 SampleDataPoint(a, b, cn, mu, log_pi, row["tumour_content"])
-#             )
-#     # Create final data point objects
-#     data = OrderedDict()
-#     for name in mutations:
-#         if len(sample_data_points[name]) != len(samples):
-#             continue
-#
-#         data[name] = DataPoint(samples, sample_data_points[name])
-#     return data
-
-
-def _create_loaded_pyclone_data_dict(df, mutations, samples):
+def _create_loaded_pyclone_data_dict(df, samples):
     data = OrderedDict()
     df = df.sort_values(by="mutation_id", ascending=True)
     grouped = df.groupby("mutation_id", sort=False)
@@ -153,7 +108,7 @@ def _remove_cn_zero_mutations(df):
     return df
 
 
-@lru_cache(maxsize=1024)
+@lru_cache(maxsize=4096)
 def get_major_cn_prior(major_cn, minor_cn, normal_cn, error_rate=1e-3):
     total_cn = major_cn + minor_cn
 
