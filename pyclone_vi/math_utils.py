@@ -6,32 +6,32 @@ from math import lgamma
 # Special functions
 
 
-@njit(cache=True)
+@njit
 def log_beta(a, b):
     return log_gamma(a) + log_gamma(b) - log_gamma(a + b)
 
 
-@njit(cache=True)
+@njit
 def log_binomial_coefficient(n, x):
     return log_factorial(n) - log_factorial(n - x) - log_factorial(x)
 
 
-@njit(cache=True)
+@njit
 def log_factorial(x):
     return log_gamma(x + 1)
 
 
-@njit(cache=True)
+@njit
 def log_gamma(x):
     return lgamma(x)
 
 
-@njit(cache=True)
+@njit
 def log_normalize(x):
     return x - log_sum_exp(x)
 
 
-@njit(cache=True)
+@njit
 def log_sum_exp(log_X):
     max_exp = np.max(log_X)
 
@@ -49,11 +49,11 @@ def log_sum_exp(log_X):
 # Probability densities
 
 
-@njit(cache=True)
+@njit
 def log_beta_binomial_pdf(n, x, a, b):
     return log_binomial_coefficient(n, x) + log_beta(a + x, b + n - x) - log_beta(a, b)
 
 
-@njit(cache=True)
+@njit
 def log_binomial_pdf(n, x, p):
     return log_binomial_coefficient(n, x) + x * np.log(p) + (n - x) * np.log1p(-p)

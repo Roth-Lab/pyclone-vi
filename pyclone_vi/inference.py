@@ -181,7 +181,7 @@ def update_theta(log_p_data, priors, var_params):
     var_params.theta = np.exp(var_params.theta)
 
 
-@njit(parallel=True, cache=True)
+@njit(parallel=True)
 def compute_log_p_data_z(log_p_data, z):
     """Equivalent to np.sum(var_params.z[:, :, np.newaxis, np.newaxis] * log_p_data[:, np.newaxis, :, :], axis=0)"""
     N, D, G = log_p_data.shape
@@ -199,7 +199,7 @@ def compute_log_p_data_z(log_p_data, z):
     return result
 
 
-@njit(parallel=True, cache=True)
+@njit(parallel=True)
 def compute_log_p_data_theta(log_p_data, theta):
     """Equivalent to np.sum(var_params.theta[np.newaxis, :, :, :] * log_p_data[:, np.newaxis, :, :], axis=(2, 3))"""
     N, D, G = log_p_data.shape
