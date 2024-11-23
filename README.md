@@ -69,8 +69,10 @@ The file should be in tab delimited format and have the following columns.
 
 1. mutation_id - Unique identifier for the mutation.
 This is free form but should match across all samples.
-> Note: PyClone-VI will remove any mutations without entries for all detected samples.
-If you have mutations with no data in some samples set their ref/alt counts to 0 for the corresponding sample.
+> [!WARNING]
+> PyClone-VI will remove any mutations without entries for all detected samples.
+> If you have mutations with no data in a subset of the samples, the correct procedure is to extract ref and alt counts for these mutations from each affected sample's associated BAM file.
+> Please refer to [this thread](https://groups.google.com/g/pyclone-user-group/c/wgXV7tq470Y) for further detail.
 
 2. sample_id - Unique identifier for the sample.
 
