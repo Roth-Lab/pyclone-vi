@@ -20,6 +20,8 @@ def fit_annealed(
     else:
         annealing_ladder = np.linspace(0, 1.0, num_annealing_steps) ** annealing_power
 
+    elbo_trace = []
+
     for t in annealing_ladder:
         print("Setting annealing factor to : {}".format(t))
         print()
@@ -132,9 +134,12 @@ def compute_e_log_p(log_p_data, priors, var_params):
 
     log_p += np.sum(var_params.theta * np.log(priors.theta)[np.newaxis, np.newaxis, :])
 
-    log_p += np.sum(
-        var_params.z * compute_log_p_data_theta(log_p_data, var_params.theta)
-    )
+    log_p_data_theta = np.zeros((log_p_data.shape[0], var_params.theta.shape[0]), order="C")
+    compute_log_p_data_theta(log_p_data, var_params.theta, log_p_data_theta)
+
+    log_p_data_theta *= var_params.z
+
+    log_p += log_p_data_theta.sum()
 
     return log_p
 
@@ -160,58 +165,62 @@ def update_pi(priors, var_params):
 
 
 def update_z(log_p_data, var_params):
-    var_params.z = compute_log_p_data_theta(log_p_data, var_params.theta)
+    log_p_data_theta = np.zeros((log_p_data.shape[0], var_params.theta.shape[0]), order="C")
+
+    compute_log_p_data_theta(log_p_data, var_params.theta, log_p_data_theta)
+
+    var_params.z = log_p_data_theta
 
     var_params.z += (psi(var_params.pi) - psi(np.sum(var_params.pi)))[np.newaxis, :]
 
     var_params.z = var_params.z - log_sum_exp(var_params.z, axis=1)[:, np.newaxis]
 
-    var_params.z = np.exp(var_params.z)
+    var_params.z = np.exp(var_params.z, order="C")
 
 
 def update_theta(log_p_data, priors, var_params):
-    var_params.theta = np.log(
-        priors.theta[np.newaxis, np.newaxis, :]
-    ) + compute_log_p_data_z(log_p_data, var_params.z)
+
+    log_p_data_z = np.zeros((var_params.z.shape[1], log_p_data.shape[1], log_p_data.shape[2]), order="C")
+
+    compute_log_p_data_z(log_p_data, var_params.z, log_p_data_z)
+
+    log_theta_prior = np.log(priors.theta)
+
+    log_p_data_z += log_theta_prior
+
+    var_params.theta = log_p_data_z
 
     var_params.theta = (
         var_params.theta - log_sum_exp(var_params.theta, axis=2)[:, :, np.newaxis]
     )
 
-    var_params.theta = np.exp(var_params.theta)
+    var_params.theta = np.exp(var_params.theta, order="C")
 
 
 @njit(parallel=True)
-def compute_log_p_data_z(log_p_data, z):
+def compute_log_p_data_z(log_p_data, z, result):
     """Equivalent to np.sum(var_params.z[:, :, np.newaxis, np.newaxis] * log_p_data[:, np.newaxis, :, :], axis=0)"""
     N, D, G = log_p_data.shape
 
     K = z.shape[1]
 
-    result = np.zeros((K, D, G))
-
-    for k in prange(K):
-        for d in range(D):
-            for g in range(G):
-                for n in range(N):
-                    result[k, d, g] += log_p_data[n, d, g] * z[n, k]
-
-    return result
+    for cluster in prange(K):
+        for mut in range(N):
+            for sample in range(D):
+                for grid_point in range(G):
+                    result[cluster, sample, grid_point] += log_p_data[mut, sample, grid_point] * z[mut, cluster]
 
 
-@njit(parallel=True)
-def compute_log_p_data_theta(log_p_data, theta):
+
+@njit(parallel=True, fastmath=True)
+def compute_log_p_data_theta(log_p_data, theta, result):
     """Equivalent to np.sum(var_params.theta[np.newaxis, :, :, :] * log_p_data[:, np.newaxis, :, :], axis=(2, 3))"""
     N, D, G = log_p_data.shape
 
     K = theta.shape[0]
 
-    result = np.zeros((N, K))
-
-    for n in prange(N):
-        for k in range(K):
-            for d in range(D):
-                for g in range(G):
-                    result[n, k] += log_p_data[n, d, g] * theta[k, d, g]
-
-    return result
+    for mut in prange(N):
+        for cluster in range(K):
+            for sample in range(D):
+                for grid_point in range(G):
+                    result[mut, cluster] += log_p_data[mut, sample, grid_point] * theta[cluster, sample, grid_point]
