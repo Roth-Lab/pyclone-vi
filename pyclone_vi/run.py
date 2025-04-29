@@ -46,14 +46,16 @@ def fit(
 
     result = None
 
-    priors = None
+    # priors = None
 
     print("Running PyClone-VI:\n")
+
+    priors = Priors(num_clusters, num_grid_points, mix_weight_prior)
 
     for i in range(num_restarts):
         print("Performing restart {}".format(i))
 
-        priors = Priors(num_clusters, num_grid_points, mix_weight_prior)
+        # priors = Priors(num_clusters, num_grid_points, mix_weight_prior)
 
         var_params = VariationalParameters(
             len(priors.pi),

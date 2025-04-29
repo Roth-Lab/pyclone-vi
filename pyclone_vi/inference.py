@@ -76,6 +76,8 @@ def fit(
 
         elbo_trace.append(curr_elbo)
 
+        # elbo_trace.append(compute_elbo(log_p_data, priors, var_params))
+        #
         # diff = (elbo_trace[-1] - elbo_trace[-2]) / np.abs(elbo_trace[-1])
         diff = (curr_elbo - prev_elbo) / np.abs(curr_elbo)
 
@@ -86,7 +88,7 @@ def fit(
 
 
 class Priors(object):
-    __slots__ = "pi", "theta", "log_theta"
+    __slots__ = "pi", "theta", "log_theta", "pi_log_gamma"
 
     def __init__(self, num_clusters: int, num_grid_points: int, mix_weight_prior: float):
         self.pi = np.full(num_clusters, mix_weight_prior, dtype=np.float64, order="C")
@@ -95,6 +97,8 @@ class Priors(object):
         self.theta = np.full(num_grid_points, theta_fill_val, dtype=np.float64, order="C")
 
         self.log_theta = np.log(self.theta)
+
+        self.pi_log_gamma = log_gamma(self.pi.sum()) - log_gamma(self.pi).sum()
 
 
 class VariationalParameters(object):
@@ -120,7 +124,8 @@ class VariationalParameters(object):
         self.theta = pre_theta
 
     def update_pi(self, priors: Priors):
-        self.pi = priors.pi + self.z.sum(axis=0)
+        # self.pi = priors.pi + self.z.sum(axis=0)
+        self.pi = np.add(priors.pi, self.z.sum(axis=0), out=self.pi)
 
     def update_z(self, log_p_data):
         new_z = get_log_p_data_theta(log_p_data, self.theta)
@@ -132,7 +137,7 @@ class VariationalParameters(object):
 
         new_z -= logsumexp(new_z, axis=1, keepdims=True)
 
-        self.z = np.exp(new_z, order="C")
+        self.z = np.exp(new_z, order="C", out=self.z)
 
     def update_theta(self, log_p_data, priors: Priors):
 
@@ -142,21 +147,37 @@ class VariationalParameters(object):
         log_p_data_z += priors.log_theta
 
         log_p_data_z -= logsumexp(log_p_data_z, axis=2, keepdims=True)
-        self.theta = np.exp(log_p_data_z, order="C")
-
+        self.theta = np.exp(log_p_data_z, order="C", out=self.theta)
 
 def compute_elbo(log_p_data, priors: Priors, var_params: VariationalParameters):
+    # e_log_p = compute_e_log_p(log_p_data, priors, var_params)
+    # e_log_q = compute_e_log_q(var_params)
+    #
+    # elbo = e_log_p - e_log_q
+    #
+    # return elbo
+
     return compute_e_log_p(log_p_data, priors, var_params) - compute_e_log_q(var_params)
 
 
 def compute_e_log_p(log_p_data, priors: Priors, var_params: VariationalParameters):
-    log_p = 0.0
+    # log_p = 0.0
 
-    log_p += log_gamma(np.sum(priors.pi)) - np.sum(log_gamma(priors.pi))
+    # log_p += log_gamma(priors.pi.sum()) - log_gamma(priors.pi).sum()
 
-    log_p += np.sum((priors.pi + np.sum(var_params.z, axis=0) - 1) * (psi(var_params.pi) - psi(np.sum(var_params.pi))))
+    log_p = priors.pi_log_gamma
 
-    log_p += np.sum(var_params.theta * priors.log_theta[np.newaxis, np.newaxis, :])
+    p_pi_z_term = priors.pi + var_params.z.sum(axis=0)
+    p_pi_z_term -= 1
+
+    pi_psi_term = psi(var_params.pi)
+    pi_psi_term -= psi(var_params.pi.sum())
+
+    p_pi_z_term *= pi_psi_term
+
+    log_p += p_pi_z_term.sum()
+
+    log_p += (var_params.theta * priors.log_theta).sum()
 
     log_p_data_theta = get_log_p_data_theta(log_p_data, var_params.theta)
 
@@ -165,6 +186,23 @@ def compute_e_log_p(log_p_data, priors: Priors, var_params: VariationalParameter
     log_p += log_p_data_theta.sum()
 
     return log_p
+
+# def compute_e_log_p(log_p_data, priors: Priors, var_params: VariationalParameters):
+#     log_p = 0.0
+#
+#     log_p += log_gamma(np.sum(priors.pi)) - np.sum(log_gamma(priors.pi))
+#
+#     log_p += np.sum((priors.pi + np.sum(var_params.z, axis=0) - 1) * (psi(var_params.pi) - psi(np.sum(var_params.pi))))
+#
+#     log_p += np.sum(var_params.theta * priors.log_theta[np.newaxis, np.newaxis, :])
+#
+#     log_p_data_theta = get_log_p_data_theta(log_p_data, var_params.theta)
+#
+#     log_p_data_theta *= var_params.z
+#
+#     log_p += log_p_data_theta.sum()
+#
+#     return log_p
 
 
 def get_log_p_data_theta(log_p_data, theta):
@@ -176,15 +214,49 @@ def get_log_p_data_theta(log_p_data, theta):
 def compute_e_log_q(var_params: VariationalParameters):
     log_p = 0.0
 
-    log_p += log_gamma(np.sum(var_params.pi)) - np.sum(log_gamma(var_params.pi))
+    pi_sum = var_params.pi.sum()
 
-    log_p += np.sum((var_params.pi - 1) * (psi(var_params.pi) - psi(np.sum(var_params.pi))))
+    log_p += log_gamma(pi_sum) - log_gamma(var_params.pi).sum()
 
-    log_p += np.sum(var_params.theta * np.log(var_params.theta + 1e-6))
+    pi_psi_term = psi(var_params.pi)
+    pi_psi_term -= psi(pi_sum)
+    pi_psi_term *= (var_params.pi - 1)
+    pi_psi_term = np.asarray(pi_psi_term)
 
-    log_p += np.sum(var_params.z * np.log(var_params.z + 1e-6))
+    # log_p += np.sum((var_params.pi - 1) * (psi(var_params.pi) - psi(np.sum(var_params.pi))))
+
+    log_p += pi_psi_term.sum()
+
+    theta_term = np.log(var_params.theta + 1e-6)
+    theta_term *= var_params.theta
+
+    log_p += theta_term.sum()
+
+    # log_p += np.sum(var_params.theta * np.log(var_params.theta + 1e-6))
+
+    # log_p += np.sum(var_params.z * np.log(var_params.z + 1e-6))
+
+    z_term = np.log(var_params.z + 1e-6)
+    z_term *= var_params.z
+
+    log_p += z_term.sum()
 
     return log_p
+
+# def compute_e_log_q(var_params):
+#     log_p = 0
+#
+#     log_p += log_gamma(np.sum(var_params.pi)) - np.sum(log_gamma(var_params.pi))
+#
+#     log_p += np.sum(
+#         (var_params.pi - 1) * (psi(var_params.pi) - psi(np.sum(var_params.pi)))
+#     )
+#
+#     log_p += np.sum(var_params.theta * np.log(var_params.theta + 1e-6))
+#
+#     log_p += np.sum(var_params.z * np.log(var_params.z + 1e-6))
+#
+#     return log_p
 
 
 @njit(parallel=True)
