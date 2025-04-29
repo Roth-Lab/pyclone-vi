@@ -29,8 +29,15 @@ def fit(
 
     rng = instantiate_and_seed_RNG(seed)
 
-    log_p_data, mutations, samples = load_data(
-        in_file, density, num_grid_points, precision=precision
+    print_welcome_message(
+        num_restarts,
+        density,
+        num_threads,
+        seed,
+        rng,
+        num_clusters,
+        num_grid_points,
+        mix_weight_prior,
     )
 
     best_elbo = float("-inf")
@@ -38,6 +45,8 @@ def fit(
     result = None
 
     priors = None
+
+    print("Running PyClone-VI:\n")
 
     for i in range(num_restarts):
         print("Performing restart {}".format(i))
@@ -137,3 +146,35 @@ def instantiate_and_seed_RNG(seed):
     else:
         rng = np.random.default_rng()
     return rng
+
+
+def print_welcome_message(
+    num_restarts,
+    density,
+    num_threads,
+    seed,
+    rng,
+    num_clusters,
+    num_grid_points,
+    mix_weight_prior,
+):
+    print()
+    print("#" * 100)
+    print("PyClone-VI: Fit")
+    print("#" * 100)
+    print()
+    print("Running with the following parameters:\n")
+    print("Density: {}".format(density))
+    print("Max number of clusters: {}".format(num_clusters))
+    print("Number of random restarts: {}".format(num_restarts))
+    print("Number of CCF approximation grid points: {}".format(num_grid_points))
+    print("Mix weight prior: {}".format(mix_weight_prior))
+    print("Number of threads: {}".format(num_threads))
+    if seed is not None:
+        seed_msg = "(user-provided)"
+    else:
+        seed_msg = "(machine-entropy)"
+    print("Random seed: {} {}".format(rng.bit_generator.seed_seq.entropy, seed_msg))
+    print()
+    print("#" * 100)
+    print()
