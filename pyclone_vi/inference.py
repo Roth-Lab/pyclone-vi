@@ -103,6 +103,8 @@ def get_variational_params(
 
 
 class Priors(object):
+    __slots__ = "pi", "theta"
+
     def __init__(self, pi, theta):
         self.pi = pi
 
@@ -110,6 +112,8 @@ class Priors(object):
 
 
 class VariationalParameters(object):
+    __slots__ = "pi", "theta", "z"
+
     def __init__(self, pi, theta, z):
         self.pi = pi
 
