@@ -7,7 +7,6 @@ import pandas as pd
 from pyclone_vi.math_utils import (
     log_beta_binomial_pdf,
     log_binomial_pdf,
-    log_normalize,
     log_sum_exp,
 )
 
@@ -15,16 +14,22 @@ from functools import lru_cache
 
 
 def load_data(file_name, density="binomial", num_grid_points=100, precision=200):
+
+    print("Parsing Input Data...\n")
+
     data, mutations, samples = load_pyclone_data(file_name)
 
-    log_p_data = []
+    generator_exp = (data_point.to_likelihood_grid(density, num_grid_points, precision=precision)
+                     for data_point in data.values())
 
-    for data_point in data.values():
-        log_p_data.append(
-            data_point.to_likelihood_grid(density, num_grid_points, precision=precision)
-        )
+    log_p_data = np.fromiter(generator_exp,
+                             dtype=np.dtype((np.float64, (len(samples), num_grid_points))),
+                             count=len(mutations))
 
-    return np.stack(log_p_data), mutations, samples
+    print("#" * 100)
+    print()
+
+    return log_p_data, mutations, samples
 
 
 def load_pyclone_data(file_name):
@@ -35,22 +40,21 @@ def load_pyclone_data(file_name):
     _process_required_columns(df)
 
     samples = sorted(df["sample_id"].unique())
-    samples_len = len(samples)
 
-    # Filter for mutations present in all samples
-    df = df.loc[df.groupby("mutation_id")["sample_id"].transform("size") == samples_len]
+    df = _remove_duplicated_and_partially_absent_mutations(df, samples)
 
     data = _create_loaded_pyclone_data_dict(df, samples)
 
     get_major_cn_prior.cache_clear()
 
     print("Num Samples: {}".format(len(samples)))
-    if len(samples) > 20:
-        print("Samples: {}...".format(" ".join(samples[:10])))
+    if len(samples) > 10:
+        print("Samples: {}...".format(" ".join(samples[:5])))
     else:
         print("Samples: {}".format(" ".join(samples)))
 
-    print("Num mutations: {}".format(len(data)))
+    print("Num Mutations: {}".format(len(data)))
+    print()
 
     return data, list(data.keys()), samples
 
@@ -92,19 +96,51 @@ def _create_loaded_pyclone_data_dict(df, samples):
 def _process_required_columns(df):
     df["sample_id"] = df["sample_id"].astype(str)
     if "error_rate" not in df.columns:
-        df.loc[:, "error_rate"] = 1e-3
-    if "tumour_content" not in df.columns:
-        print("Tumour content column not found. Setting values to 1.0.")
+        print("Error rate column not found, setting values to {}.\n".format(1e-3))
+        df["error_rate"] = 1e-3
 
-        df.loc[:, "tumour_content"] = 1.0
-    print()
+    if "tumour_content" not in df.columns:
+        print("Tumour content column not found, setting values to 1.0.\n")
+        df["tumour_content"] = 1.0
+
 
 
 def _remove_cn_zero_mutations(df):
-    num_dels = sum(df["major_cn"] == 0)
+    num_dels = len(df.loc[df["major_cn"] == 0])
     if num_dels > 0:
         print("Removing {} mutations with major copy number zero".format(num_dels))
     df = df.loc[df["major_cn"] > 0]
+    return df
+
+
+def _remove_duplicated_and_partially_absent_mutations(df, samples):
+    samples_len = len(samples)
+    group_transform = df.groupby("mutation_id")["sample_id"].transform("size")
+    num_not_present_in_all = len(df.loc[group_transform < samples_len]["mutation_id"].unique())
+    num_duplicates = len(df.loc[group_transform > samples_len]["mutation_id"].unique())
+    if num_duplicates > 0:
+        if num_duplicates == 1:
+            pl = ""
+        else:
+            pl = "s"
+        print("Removing {} duplicate mutation ID{}".format(num_duplicates, pl))
+    if num_not_present_in_all > 0:
+        if num_not_present_in_all == 1:
+            pl = ("", "is")
+        else:
+            pl = ("s", "are")
+        print(
+            "Removing {} mutation{} that {} not present in all samples".format(
+                num_not_present_in_all,
+                pl[0],
+                pl[1],
+            )
+        )
+    df = df.loc[group_transform == samples_len]
+
+    if (num_duplicates > 0) or (num_not_present_in_all > 0):
+        print()
+
     return df
 
 
@@ -112,37 +148,22 @@ def _remove_cn_zero_mutations(df):
 def get_major_cn_prior(major_cn, minor_cn, normal_cn, error_rate=1e-3):
     total_cn = major_cn + minor_cn
 
-    cn = []
-
-    mu = []
-
-    log_pi = []
-
     # Consider all possible mutational genotypes consistent with mutation before CN change
-    for x in range(1, major_cn + 1):
-        cn.append((normal_cn, normal_cn, total_cn))
-
-        mu.append((error_rate, error_rate, min(1 - error_rate, x / total_cn)))
-
-        log_pi.append(0)
+    cn = [(normal_cn, normal_cn, total_cn) for _ in range(1, major_cn + 1)]
+    mu = [(error_rate, error_rate, min(1 - error_rate, x / total_cn)) for x in range(1, major_cn + 1)]
 
     # Consider mutational genotype of mutation before CN change if not already added
-    mutation_after_cn = (normal_cn, total_cn, total_cn)
-
-    if mutation_after_cn not in cn:
+    if total_cn != normal_cn:
+        mutation_after_cn = (normal_cn, total_cn, total_cn)
         cn.append(mutation_after_cn)
-
         mu.append((error_rate, error_rate, min(1 - error_rate, 1 / total_cn)))
-
-        log_pi.append(0)
-
         assert len(set(cn)) == 2
 
     cn = np.array(cn, dtype=int)
-
     mu = np.array(mu, dtype=float)
 
-    log_pi = log_normalize(np.array(log_pi, dtype=float))
+    log_pi_val = -np.log(len(cn))
+    log_pi = np.full(len(cn), log_pi_val)
 
     return cn, mu, log_pi
 
