@@ -27,8 +27,7 @@ dependencies = [
 classifiers = [
     "Private :: Do Not Upload",
     "Development Status :: 4 - Beta",
-    "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)"
+    "Programming Language :: Python :: 3.12"
 ]
 
 [project.urls]
@@ -42,4 +41,4 @@ pyclone-vi = "pyclone_vi.cli:main"
 line-length = 120
 
 [tool.setuptools.packages.find]
-exclude = ["*examples*"]
+exclude = ["*.tests*", "*examples*"]
