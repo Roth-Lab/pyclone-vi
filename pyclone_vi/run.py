@@ -4,8 +4,8 @@ from numba import set_num_threads
 
 from pyclone_vi.data import load_data
 
-import pyclone_vi.inference
-import pyclone_vi.post_process
+from pyclone_vi.inference import Priors, fit_annealed, VariationalParameters
+from pyclone_vi.post_process import load_results_df, fix_cluster_ids
 
 
 def fit(
@@ -40,6 +40,8 @@ def fit(
         mix_weight_prior,
     )
 
+    log_p_data, mutations, samples = load_data(in_file, density, num_grid_points, precision=precision)
+
     best_elbo = float("-inf")
 
     result = None
@@ -51,11 +53,9 @@ def fit(
     for i in range(num_restarts):
         print("Performing restart {}".format(i))
 
-        priors = pyclone_vi.inference.get_priors(num_clusters, num_grid_points)
+        priors = Priors(num_clusters, num_grid_points, mix_weight_prior)
 
-        priors.pi = np.ones(num_clusters) * mix_weight_prior
-
-        var_params = pyclone_vi.inference.get_variational_params(
+        var_params = VariationalParameters(
             len(priors.pi),
             log_p_data.shape[0],
             log_p_data.shape[1],
@@ -63,7 +63,7 @@ def fit(
             rng,
         )
 
-        elbo_trace = pyclone_vi.inference.fit_annealed(
+        elbo_trace = fit_annealed(
             log_p_data,
             priors,
             var_params,
@@ -81,9 +81,7 @@ def fit(
 
         print("Fitting completed")
         print("ELBO: {}".format(elbo_trace[-1]))
-        print(
-            "Number of clusters used: {}".format(len(set(var_params.z.argmax(axis=1))))
-        )
+        print("Number of clusters used: {}".format(len(set(var_params.z.argmax(axis=1)))))
         print()
 
     elbo_trace, var_params = result
@@ -92,14 +90,10 @@ def fit(
     print("Final ELBO: {}".format(elbo_trace[-1]))
     print("Number of clusters used: {}".format(len(set(var_params.z.argmax(axis=1)))))
 
-    _create_fit_results_file(
-        elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params
-    )
+    _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params)
 
 
-def _create_fit_results_file(
-    elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params
-):
+def _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params):
     with h5py.File(out_file, "w") as fh:
         fh.create_dataset(
             "/data/mutations",
@@ -127,14 +121,12 @@ def _create_fit_results_file(
 
 
 def write_results_file(in_file, out_file, compress=False):
-    df = pyclone_vi.post_process.load_results_df(in_file)
+    df = load_results_df(in_file)
 
-    df = pyclone_vi.post_process.fix_cluster_ids(df)
+    df = fix_cluster_ids(df)
 
     if compress:
-        df.to_csv(
-            out_file, compression="gzip", float_format="%.4f", index=False, sep="\t"
-        )
+        df.to_csv(out_file, compression="gzip", float_format="%.4f", index=False, sep="\t")
 
     else:
         df.to_csv(out_file, float_format="%.4f", index=False, sep="\t")

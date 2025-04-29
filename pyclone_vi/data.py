@@ -19,12 +19,13 @@ def load_data(file_name, density="binomial", num_grid_points=100, precision=200)
 
     data, mutations, samples = load_pyclone_data(file_name)
 
-    generator_exp = (data_point.to_likelihood_grid(density, num_grid_points, precision=precision)
-                     for data_point in data.values())
+    generator_exp = (
+        data_point.to_likelihood_grid(density, num_grid_points, precision=precision) for data_point in data.values()
+    )
 
-    log_p_data = np.fromiter(generator_exp,
-                             dtype=np.dtype((np.float64, (len(samples), num_grid_points))),
-                             count=len(mutations))
+    log_p_data = np.fromiter(
+        generator_exp, dtype=np.dtype((np.float64, (len(samples), num_grid_points))), count=len(mutations)
+    )
 
     print("#" * 100)
     print()
@@ -82,11 +83,7 @@ def _create_loaded_pyclone_data_dict(df, samples):
                 error_rate=group.at[sample, "error_rate"],
             )
 
-            sample_data_points.append(
-                SampleDataPoint(
-                    a, b, cn, mu, log_pi, group.at[sample, "tumour_content"]
-                )
-            )
+            sample_data_points.append(SampleDataPoint(a, b, cn, mu, log_pi, group.at[sample, "tumour_content"]))
 
         data[mutation] = DataPoint(samples, sample_data_points)
 
@@ -102,7 +99,6 @@ def _process_required_columns(df):
     if "tumour_content" not in df.columns:
         print("Tumour content column not found, setting values to 1.0.\n")
         df["tumour_content"] = 1.0
-
 
 
 def _remove_cn_zero_mutations(df):
@@ -189,9 +185,7 @@ class DataPoint(object):
 
         for s_idx, data_point in enumerate(self.sample_data_points):
             if density == "beta-binomial":
-                log_ll[s_idx] = log_pyclone_beta_binomial_pdf_grid(
-                    data_point, grid, precision
-                )
+                log_ll[s_idx] = log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision)
 
             elif density == "binomial":
                 log_ll[s_idx] = log_pyclone_binomial_pdf_grid(data_point, grid)

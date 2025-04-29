@@ -8,7 +8,7 @@ import pyclone_vi.run
     "-i",
     "--in-file",
     required=True,
-    type=click.Path(exists=True, resolve_path=True),
+    type=click.Path(exists=True, resolve_path=True, readable=True),
     help="""Path to TSV format file with copy number and allele count information for all samples. """
     """See the examples directory in the GitHub repository for format.""",
 )
@@ -16,7 +16,7 @@ import pyclone_vi.run
     "-o",
     "--out-file",
     required=True,
-    type=click.Path(resolve_path=True),
+    type=click.Path(resolve_path=True, writable=True),
     help="""Path to where results will be written in HDF5 format.""",
 )
 @click.option(
@@ -69,49 +69,44 @@ import pyclone_vi.run
     "--annealing-power",
     default=1.0,
     type=float,
-    help="""Exponent of entries in the annealing ladder.""" """Default is 1.0.""",
+    help="""Exponent of entries in the annealing ladder. Default is 1.0.""",
 )
 @click.option(
     "--convergence-threshold",
     default=1e-6,
     type=float,
-    help="""Maximum relative ELBO difference between iterations to decide on convergence. """
-    """Default is 10^-6.""",
+    help="""Maximum relative ELBO difference between iterations to decide on convergence. Default is 10^-6.""",
 )
 @click.option(
     "--max-iters",
     default=int(1e4),
     type=int,
-    help="""Maximum number of ELBO optimization iterations."""
-    """Default is 10,0000.""",
+    help="""Maximum number of ELBO optimization iterations. Default is 10,0000.""",
 )
 @click.option(
     "--mix-weight-prior",
     default=1.0,
     type=float,
-    help="""Parameter value of symmetric Dirichlet prior distribution on mixture weights. Higher values will produce more clusters. """
-    """Default is 1.0 which is the uniform prior.""",
+    help="""Parameter value of symmetric Dirichlet prior distribution on mixture weights. 
+    Higher values will produce more clusters. Default is 1.0 which is the uniform prior.""",
 )
 @click.option(
     "--precision",
     default=200,
     type=float,
-    help="""Precision for Beta-Binomial density. Has no effect when using Binomial. """
-    """Default is 200.""",
+    help="""Precision for Beta-Binomial density. Has no effect when using Binomial. Default is 200.""",
 )
 @click.option(
     "--print-freq",
     default=100,
     type=int,
-    help="""How often to print information about optimization. """
-    """Default is every 100 iteration.""",
+    help="""How often to print information about optimization. Default is every 100 iteration.""",
 )
 @click.option(
     "--seed",
     default=None,
     type=int,
-    help="""Set random seed so results can be reproduced. """
-    """By default a random seed is chosen.""",
+    help="""Set random seed so results can be reproduced. By default, a random seed is chosen.""",
 )
 def fit(**kwargs):
     """Fit PyClone-VI model to data."""
