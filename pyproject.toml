@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "PyClone-VI"
+version = "0.2.0"
+description="A fast method for inferring clonal population structure."
+authors = [
+    {name = "Andrew Roth", email = "aroth@bccrc.ca"}
+]
+maintainers = [
+    {name = "Andrew Roth", email = "aroth@bccrc.ca"}
+]
+readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["LICEN[CS]E.*"]
+requires-python = ">=3.12"
+dependencies = [
+    "numba>=0.61.2",
+    "numpy>=1.26.4",
+    "scipy",
+    "click>=8.0",
+    "pandas>=2.2.2",
+    "h5py"
+]
+classifiers = [
+    "Private :: Do Not Upload",
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)"
+]
+
+[project.urls]
+Repository = "https://github.com/Roth-Lab/pyclone-vi.git"
+Homepage = "https://github.com/Roth-Lab/pyclone-vi"
+
+[project.scripts]
+pyclone-vi = "pyclone_vi.cli:main"
+
+[tool.black]
+line-length = 120
+
+[tool.setuptools.packages.find]
+exclude = ["*examples*"]
