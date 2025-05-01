@@ -81,7 +81,7 @@ import pyclone_vi.run
     "--max-iters",
     default=int(1e4),
     type=int,
-    help="""Maximum number of ELBO optimization iterations. Default is 10,0000.""",
+    help="""Maximum number of ELBO optimization iterations. Default is 10,000.""",
 )
 @click.option(
     "--mix-weight-prior",

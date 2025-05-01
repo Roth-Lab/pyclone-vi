@@ -31,14 +31,14 @@ def log_normalize(x):
     return x - log_sum_exp(x)
 
 
-@njit
+@njit("float64(float64[:])", fastmath=True)
 def log_sum_exp(log_X):
-    max_exp = np.max(log_X)
+    max_exp = log_X.max()
 
     if np.isinf(max_exp):
         return max_exp
 
-    total = 0
+    total = 0.0
 
     for x in log_X:
         total += np.exp(x - max_exp)

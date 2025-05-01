@@ -1,6 +1,7 @@
 from collections import OrderedDict
+from numba import njit, prange, int64, float64
 
-import numba
+from numba.experimental import jitclass
 import numpy as np
 import pandas as pd
 
@@ -17,15 +18,13 @@ def load_data(file_name, density="binomial", num_grid_points=100, precision=200)
 
     print("Parsing Input Data...\n")
 
-    data, mutations, samples = load_pyclone_data(file_name)
+    data, samples = load_pyclone_data(file_name)
 
-    generator_exp = (
-        data_point.to_likelihood_grid(density, num_grid_points, precision=precision) for data_point in data.values()
-    )
+    mutations = data.index.to_list()
 
-    log_p_data = np.fromiter(
-        generator_exp, dtype=np.dtype((np.float64, (len(samples), num_grid_points))), count=len(mutations)
-    )
+    log_p_data = data.apply(dp_likelihood_grid, args=(density, num_grid_points, precision))
+
+    log_p_data = log_p_data.to_numpy(dtype=np.dtype((np.float64, (len(samples), num_grid_points))))
 
     print("#" * 100)
     print()
@@ -33,8 +32,13 @@ def load_data(file_name, density="binomial", num_grid_points=100, precision=200)
     return log_p_data, mutations, samples
 
 
+def dp_likelihood_grid(dp, density, num_grid_points, precision):
+    return dp.to_likelihood_grid(density, num_grid_points, precision=precision)
+
+
 def load_pyclone_data(file_name):
     df = pd.read_csv(file_name, sep="\t")
+    df = df.drop_duplicates()
 
     df = _remove_cn_zero_mutations(df)
 
@@ -57,21 +61,23 @@ def load_pyclone_data(file_name):
     print("Num Mutations: {}".format(len(data)))
     print()
 
-    return data, list(data.keys()), samples
+    return data, samples
 
 
 def _create_loaded_pyclone_data_dict(df, samples):
-    data = OrderedDict()
     df.set_index("sample_id", inplace=True)
+    df.sort_index(inplace=True)
     grouped = df.groupby("mutation_id", sort=False)
+    samples = pd.Index(samples, name="sample_id")
 
-    for mutation, group in grouped:
-
-        sample_dp_df = group.apply(create_sample_data_point, axis=1)
-
-        data[mutation] = DataPoint(samples, sample_dp_df)
+    data = grouped.apply(make_datapoint_from_group, samples=samples, include_groups=False)
 
     return data
+
+
+def make_datapoint_from_group(group, samples):
+    sample_dp_df = group.agg(create_sample_data_point, axis=1)
+    return DataPoint(samples, sample_dp_df)
 
 
 def create_sample_data_point(row_series):
@@ -170,44 +176,45 @@ def get_major_cn_prior(major_cn, minor_cn, normal_cn, error_rate=1e-3):
 
 
 class DataPoint(object):
+    __slots__ = "samples", "sample_data_points"
+
     def __init__(self, samples, sample_data_points):
         self.samples = samples
-
         self.sample_data_points = sample_data_points
 
-    def get_ccf_grid(self, grid_size, eps=1e-6):
+        if not samples.equals(sample_data_points.index):
+            self.sample_data_points.sort_index(inplace=True)
+            assert samples.equals(sample_data_points.index)
+
+    @staticmethod
+    def get_ccf_grid(grid_size, eps=1e-6):
         return np.linspace(eps, 1 - eps, grid_size)
 
     def to_dict(self):
-        return OrderedDict(zip(self.samples, self.sample_data_points))
+        return self.sample_data_points.to_dict(into=OrderedDict)
 
     def to_likelihood_grid(self, density, num_grid_points, precision=200):
-        shape = (len(self.samples), num_grid_points)
-
-        log_ll = np.zeros(shape)
-
         grid = self.get_ccf_grid(num_grid_points)
 
         if density == "beta-binomial":
-            for s_idx, sample in enumerate(self.samples):
-                log_pyclone_beta_binomial_pdf_grid(self.sample_data_points[sample], grid, precision, log_ll[s_idx])
-
+            grid_res = self.sample_data_points.apply(log_pyclone_beta_binomial_pdf_grid_helper, args=(grid, precision, num_grid_points),)
         elif density == "binomial":
-            for s_idx, sample in enumerate(self.samples):
-                log_pyclone_binomial_pdf_grid(self.sample_data_points[sample], grid, log_ll[s_idx])
+            grid_res = self.sample_data_points.apply(log_pyclone_binomial_pdf_grid_helper, args=(grid, num_grid_points),)
+        else:
+            raise NotImplemented("Unknown density: {}".format(density))
 
-
+        log_ll = grid_res.to_numpy(dtype=np.dtype((np.float64, num_grid_points)))
         return log_ll
 
 
-@numba.experimental.jitclass(
+@jitclass(
     [
-        ("a", numba.int64),
-        ("b", numba.int64),
-        ("cn", numba.int64[:, :]),
-        ("mu", numba.float64[:, :]),
-        ("log_pi", numba.float64[:]),
-        ("t", numba.float64)
+        ("a", int64),
+        ("b", int64),
+        ("cn", int64[:, :]),
+        ("mu", float64[:, :]),
+        ("log_pi", float64[:]),
+        ("t", float64)
     ]
 )
 class SampleDataPoint(object):
@@ -220,30 +227,31 @@ class SampleDataPoint(object):
         self.t = t
 
 
-@numba.njit(parallel=True)
+def log_pyclone_beta_binomial_pdf_grid_helper(data_point, grid, precision, num_grid_points):
+    log_ll = np.empty(num_grid_points, dtype=np.float64, order="C")
+    log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision, log_ll)
+    return log_ll
+
+
+def log_pyclone_binomial_pdf_grid_helper(data_point, grid, num_grid_points):
+    log_ll = np.empty(num_grid_points, dtype=np.float64, order="C")
+    log_pyclone_binomial_pdf_grid(data_point, grid, log_ll)
+    return log_ll
+
+
+@njit(parallel=True)
 def log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision, log_ll):
-    for i in numba.prange(len(grid)):
+    for i in prange(len(grid)):
         log_ll[i] = log_pyclone_beta_binomial_pdf(data_point, grid[i], precision)
 
 
-@numba.njit(parallel=True)
+@njit(parallel=True)
 def log_pyclone_binomial_pdf_grid(data_point, grid, log_ll):
-    for i in numba.prange(len(grid)):
+    for i in prange(len(grid)):
         log_ll[i] = log_pyclone_binomial_pdf(data_point, grid[i])
 
-# @numba.njit
-# def log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision, log_ll):
-#     for i, ccf in enumerate(grid):
-#         log_ll[i] = log_pyclone_beta_binomial_pdf(data_point, ccf, precision)
-#
-#
-# @numba.njit
-# def log_pyclone_binomial_pdf_grid(data_point, grid, log_ll):
-#     for i, ccf in enumerate(grid):
-#         log_ll[i] = log_pyclone_binomial_pdf(data_point, ccf)
 
-
-@numba.njit
+@njit
 def log_pyclone_beta_binomial_pdf(data, f, s):
     t = data.t
 
@@ -279,7 +287,7 @@ def log_pyclone_beta_binomial_pdf(data, f, s):
     return log_sum_exp(ll)
 
 
-@numba.njit
+@njit
 def log_pyclone_binomial_pdf(data, f):
     t = data.t
 
