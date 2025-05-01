@@ -243,7 +243,8 @@ def log_pyclone_beta_binomial_pdf(data, f, s):
     population_prior[1] = t * (1 - f)
     population_prior[2] = t * f
 
-    ll = np.ones(C, dtype=np.float64) * np.inf * -1
+    # ll = np.ones(C, dtype=np.float64) * np.inf * -1
+    ll = np.full(C, -np.inf, dtype=np.float64)
 
     for c in range(C):
         e_vaf = 0
@@ -279,7 +280,8 @@ def log_pyclone_binomial_pdf(data, f):
     population_prior[1] = t * (1 - f)
     population_prior[2] = t * f
 
-    ll = np.ones(C, dtype=np.float64) * np.inf * -1
+    # ll = np.ones(C, dtype=np.float64) * np.inf * -1
+    ll = np.full(C, -np.inf, dtype=np.float64)
 
     for c in range(C):
         e_vaf = 0
