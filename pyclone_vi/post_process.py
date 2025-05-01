@@ -59,6 +59,8 @@ def load_cluster_df(file_name):
 
             var = np.sum(x**2 * q) - mean**2
 
+            var = max(0.0, var)
+
             std = np.sqrt(var)
 
             df.append(
