@@ -62,32 +62,37 @@ def load_pyclone_data(file_name):
 
 def _create_loaded_pyclone_data_dict(df, samples):
     data = OrderedDict()
-    df = df.sort_values(by="mutation_id", ascending=True)
+    df.set_index("sample_id", inplace=True)
     grouped = df.groupby("mutation_id", sort=False)
 
     for mutation, group in grouped:
-        sample_data_points = []
 
-        group.set_index("sample_id", inplace=True)
+        sample_dp_df = group.apply(create_sample_data_point, axis=1)
 
-        for sample in samples:
-
-            a = group.at[sample, "ref_counts"]
-
-            b = group.at[sample, "alt_counts"]
-
-            cn, mu, log_pi = get_major_cn_prior(
-                group.at[sample, "major_cn"],
-                group.at[sample, "minor_cn"],
-                group.at[sample, "normal_cn"],
-                error_rate=group.at[sample, "error_rate"],
-            )
-
-            sample_data_points.append(SampleDataPoint(a, b, cn, mu, log_pi, group.at[sample, "tumour_content"]))
-
-        data[mutation] = DataPoint(samples, sample_data_points)
+        data[mutation] = DataPoint(samples, sample_dp_df)
 
     return data
+
+
+def create_sample_data_point(row_series):
+    major_cn = int(row_series["major_cn"])
+    minor_cn = row_series["minor_cn"]
+    normal_cn = row_series["normal_cn"]
+    error_rate = row_series["error_rate"]
+    ref_count = row_series["ref_counts"]
+    alt_count = row_series["alt_counts"]
+    tumour_content = row_series["tumour_content"]
+
+    cn, mu, log_pi = get_major_cn_prior(
+            major_cn,
+            minor_cn,
+            normal_cn,
+            error_rate,
+        )
+
+    sample_dp = SampleDataPoint(ref_count, alt_count, cn, mu, log_pi, tumour_content)
+
+    return sample_dp
 
 
 def _process_required_columns(df):
@@ -155,8 +160,8 @@ def get_major_cn_prior(major_cn, minor_cn, normal_cn, error_rate=1e-3):
         mu.append((error_rate, error_rate, min(1 - error_rate, 1 / total_cn)))
         assert len(set(cn)) == 2
 
-    cn = np.array(cn, dtype=int)
-    mu = np.array(mu, dtype=float)
+    cn = np.array(cn, dtype=np.int64)
+    mu = np.array(mu, dtype=np.float64)
 
     log_pi_val = -np.log(len(cn))
     log_pi = np.full(len(cn), log_pi_val)
@@ -183,12 +188,14 @@ class DataPoint(object):
 
         grid = self.get_ccf_grid(num_grid_points)
 
-        for s_idx, data_point in enumerate(self.sample_data_points):
-            if density == "beta-binomial":
-                log_ll[s_idx] = log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision)
+        if density == "beta-binomial":
+            for s_idx, sample in enumerate(self.samples):
+                log_pyclone_beta_binomial_pdf_grid(self.sample_data_points[sample], grid, precision, log_ll[s_idx])
 
-            elif density == "binomial":
-                log_ll[s_idx] = log_pyclone_binomial_pdf_grid(data_point, grid)
+        elif density == "binomial":
+            for s_idx, sample in enumerate(self.samples):
+                log_pyclone_binomial_pdf_grid(self.sample_data_points[sample], grid, log_ll[s_idx])
+
 
         return log_ll
 
@@ -200,7 +207,7 @@ class DataPoint(object):
         ("cn", numba.int64[:, :]),
         ("mu", numba.float64[:, :]),
         ("log_pi", numba.float64[:]),
-        ("t", numba.float64),
+        ("t", numba.float64)
     ]
 )
 class SampleDataPoint(object):
@@ -214,23 +221,15 @@ class SampleDataPoint(object):
 
 
 @numba.njit
-def log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision):
-    log_ll = np.zeros(grid.shape)
-
+def log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision, log_ll):
     for i, ccf in enumerate(grid):
         log_ll[i] = log_pyclone_beta_binomial_pdf(data_point, ccf, precision)
 
-    return log_ll
-
 
 @numba.njit
-def log_pyclone_binomial_pdf_grid(data_point, grid):
-    log_ll = np.zeros(grid.shape)
-
+def log_pyclone_binomial_pdf_grid(data_point, grid, log_ll):
     for i, ccf in enumerate(grid):
         log_ll[i] = log_pyclone_binomial_pdf(data_point, ccf)
-
-    return log_ll
 
 
 @numba.njit
