@@ -220,16 +220,27 @@ class SampleDataPoint(object):
         self.t = t
 
 
-@numba.njit
+@numba.njit(parallel=True)
 def log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision, log_ll):
-    for i, ccf in enumerate(grid):
-        log_ll[i] = log_pyclone_beta_binomial_pdf(data_point, ccf, precision)
+    for i in numba.prange(len(grid)):
+        log_ll[i] = log_pyclone_beta_binomial_pdf(data_point, grid[i], precision)
 
 
-@numba.njit
+@numba.njit(parallel=True)
 def log_pyclone_binomial_pdf_grid(data_point, grid, log_ll):
-    for i, ccf in enumerate(grid):
-        log_ll[i] = log_pyclone_binomial_pdf(data_point, ccf)
+    for i in numba.prange(len(grid)):
+        log_ll[i] = log_pyclone_binomial_pdf(data_point, grid[i])
+
+# @numba.njit
+# def log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision, log_ll):
+#     for i, ccf in enumerate(grid):
+#         log_ll[i] = log_pyclone_beta_binomial_pdf(data_point, ccf, precision)
+#
+#
+# @numba.njit
+# def log_pyclone_binomial_pdf_grid(data_point, grid, log_ll):
+#     for i, ccf in enumerate(grid):
+#         log_ll[i] = log_pyclone_binomial_pdf(data_point, ccf)
 
 
 @numba.njit
@@ -243,7 +254,6 @@ def log_pyclone_beta_binomial_pdf(data, f, s):
     population_prior[1] = t * (1 - f)
     population_prior[2] = t * f
 
-    # ll = np.ones(C, dtype=np.float64) * np.inf * -1
     ll = np.full(C, -np.inf, dtype=np.float64)
 
     for c in range(C):
@@ -280,7 +290,6 @@ def log_pyclone_binomial_pdf(data, f):
     population_prior[1] = t * (1 - f)
     population_prior[2] = t * f
 
-    # ll = np.ones(C, dtype=np.float64) * np.inf * -1
     ll = np.full(C, -np.inf, dtype=np.float64)
 
     for c in range(C):
