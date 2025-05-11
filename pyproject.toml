@@ -22,7 +22,8 @@ dependencies = [
     "scipy",
     "click>=8.0",
     "pandas>=2.2.2",
-    "h5py"
+    "h5py>=3.0",
+    "threadpoolctl>=3.6.0"
 ]
 classifiers = [
     "Private :: Do Not Upload",

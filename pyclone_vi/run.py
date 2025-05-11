@@ -1,9 +1,9 @@
+from threadpoolctl import threadpool_limits
 import h5py
 import numpy as np
 from numba import set_num_threads
 
 from pyclone_vi.data import load_data
-
 from pyclone_vi.inference import Priors, fit_annealed, VariationalParameters
 from pyclone_vi.post_process import load_results_df, fix_cluster_ids
 
@@ -25,6 +25,7 @@ def fit(
     print_freq=100,
     seed=None,
 ):
+
     set_num_threads(num_threads)
 
     rng = instantiate_and_seed_RNG(seed)
@@ -46,45 +47,42 @@ def fit(
 
     result = None
 
-    # priors = None
-
     print("Running PyClone-VI:\n")
 
     priors = Priors(num_clusters, num_grid_points, mix_weight_prior)
 
-    for i in range(num_restarts):
-        print("Performing restart {}".format(i))
+    with threadpool_limits(limits=num_threads, user_api="blas"):
+        for i in range(num_restarts):
+            print("Performing restart {}".format(i))
 
-        # priors = Priors(num_clusters, num_grid_points, mix_weight_prior)
+            var_params = VariationalParameters(
+                len(priors.pi),
+                log_p_data.shape[0],
+                log_p_data.shape[1],
+                log_p_data.shape[2],
+                rng,
+            )
 
-        var_params = VariationalParameters(
-            len(priors.pi),
-            log_p_data.shape[0],
-            log_p_data.shape[1],
-            log_p_data.shape[2],
-            rng,
-        )
+            elbo_trace = fit_annealed(
+                log_p_data,
+                priors,
+                var_params,
+                annealing_power=annealing_power,
+                convergence_threshold=convergence_threshold,
+                max_iters=max_iters,
+                num_annealing_steps=num_annealing_steps,
+                print_freq=print_freq,
+            )
 
-        elbo_trace = fit_annealed(
-            log_p_data,
-            priors,
-            var_params,
-            annealing_power=annealing_power,
-            convergence_threshold=convergence_threshold,
-            max_iters=max_iters,
-            num_annealing_steps=num_annealing_steps,
-            print_freq=print_freq,
-        )
+            if elbo_trace[-1] > best_elbo:
+                best_elbo = elbo_trace[-1]
 
-        if elbo_trace[-1] > best_elbo:
-            best_elbo = elbo_trace[-1]
+                result = (elbo_trace, var_params)
 
-            result = (elbo_trace, var_params)
-
-        print("Fitting completed")
-        print("ELBO: {}".format(elbo_trace[-1]))
-        print("Number of clusters used: {}".format(len(set(var_params.z.argmax(axis=1)))))
-        print()
+            print("Fitting completed")
+            print("ELBO: {}".format(elbo_trace[-1]))
+            print("Number of clusters used: {}".format(len(set(var_params.z.argmax(axis=1)))))
+            print()
 
     elbo_trace, var_params = result
 
