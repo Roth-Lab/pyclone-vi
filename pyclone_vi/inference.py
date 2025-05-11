@@ -1,6 +1,5 @@
 from __future__ import annotations
 from scipy.special import gammaln as log_gamma, logsumexp, psi
-# from numba import njit, prange
 import numpy as np
 
 
@@ -137,9 +136,6 @@ class VariationalParameters(object):
 
     def update_theta(self, log_p_data, priors: Priors):
 
-        # log_p_data_z = np.zeros((self.z.shape[1], log_p_data.shape[1], log_p_data.shape[2]), order="C")
-        # compute_log_p_data_z(log_p_data, self.z, log_p_data_z)
-
         log_p_data_z = np.tensordot(self.z, log_p_data, axes=([0], [0]))
 
         log_p_data_z += priors.log_theta
@@ -177,10 +173,7 @@ def compute_e_log_p(log_p_data, priors: Priors, var_params: VariationalParameter
 
 
 def get_log_p_data_theta(log_p_data, theta):
-    # log_p_data_theta = np.zeros((log_p_data.shape[0], theta.shape[0]), order="C")
-    # compute_log_p_data_theta(log_p_data, theta, log_p_data_theta)
     log_p_data_theta = np.tensordot(log_p_data, theta, axes=([2, 1], [2, 1]))
-
     return log_p_data_theta
 
 
@@ -209,31 +202,3 @@ def compute_e_log_q(var_params: VariationalParameters):
     log_p += z_term.sum()
 
     return log_p
-
-
-# @njit(parallel=True)
-# def compute_log_p_data_z(log_p_data, z, result):
-#     """Equivalent to np.sum(var_params.z[:, :, np.newaxis, np.newaxis] * log_p_data[:, np.newaxis, :, :], axis=0)"""
-#     N, D, G = log_p_data.shape
-#
-#     K = z.shape[1]
-#
-#     for cluster in prange(K):
-#         for mut in range(N):
-#             for sample in range(D):
-#                 for grid_point in range(G):
-#                     result[cluster, sample, grid_point] += log_p_data[mut, sample, grid_point] * z[mut, cluster]
-#
-#
-# @njit(parallel=True, fastmath=True)
-# def compute_log_p_data_theta(log_p_data, theta, result):
-#     """Equivalent to np.sum(var_params.theta[np.newaxis, :, :, :] * log_p_data[:, np.newaxis, :, :], axis=(2, 3))"""
-#     N, D, G = log_p_data.shape
-#
-#     K = theta.shape[0]
-#
-#     for mut in prange(N):
-#         for cluster in range(K):
-#             for sample in range(D):
-#                 for grid_point in range(G):
-#                     result[mut, cluster] += log_p_data[mut, sample, grid_point] * theta[cluster, sample, grid_point]
