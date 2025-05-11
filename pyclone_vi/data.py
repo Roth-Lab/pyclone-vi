@@ -90,11 +90,11 @@ def create_sample_data_point(row_series):
     tumour_content = row_series["tumour_content"]
 
     cn, mu, log_pi = get_major_cn_prior(
-            major_cn,
-            minor_cn,
-            normal_cn,
-            error_rate,
-        )
+        major_cn,
+        minor_cn,
+        normal_cn,
+        error_rate,
+    )
 
     sample_dp = SampleDataPoint(ref_count, alt_count, cn, mu, log_pi, tumour_content)
 
@@ -197,9 +197,15 @@ class DataPoint(object):
         grid = self.get_ccf_grid(num_grid_points)
 
         if density == "beta-binomial":
-            grid_res = self.sample_data_points.apply(log_pyclone_beta_binomial_pdf_grid_helper, args=(grid, precision, num_grid_points),)
+            grid_res = self.sample_data_points.apply(
+                log_pyclone_beta_binomial_pdf_grid_helper,
+                args=(grid, precision, num_grid_points),
+            )
         elif density == "binomial":
-            grid_res = self.sample_data_points.apply(log_pyclone_binomial_pdf_grid_helper, args=(grid, num_grid_points),)
+            grid_res = self.sample_data_points.apply(
+                log_pyclone_binomial_pdf_grid_helper,
+                args=(grid, num_grid_points),
+            )
         else:
             raise NotImplemented("Unknown density: {}".format(density))
 
@@ -214,7 +220,7 @@ class DataPoint(object):
         ("cn", int64[:, :]),
         ("mu", float64[:, :]),
         ("log_pi", float64[:]),
-        ("t", float64)
+        ("t", float64),
     ]
 )
 class SampleDataPoint(object):
