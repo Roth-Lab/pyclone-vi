@@ -4,7 +4,7 @@ import numpy as np
 from numba import set_num_threads
 
 from pyclone_vi.data import load_data
-from pyclone_vi.inference import Priors, fit_annealed, VariationalParameters
+from pyclone_vi.inference import Priors, fit_pyclone_model, VariationalParameters
 from pyclone_vi.post_process import load_results_df, fix_cluster_ids
 
 
@@ -13,10 +13,8 @@ def fit(
     out_file,
     convergence_threshold=1e-6,
     density="binomial",
-    annealing_power=1.0,
     max_iters=int(1e4),
     mix_weight_prior=1.0,
-    num_annealing_steps=1,
     num_clusters=10,
     num_grid_points=100,
     num_restarts=1,
@@ -63,14 +61,12 @@ def fit(
                 rng,
             )
 
-            elbo_trace = fit_annealed(
+            elbo_trace = fit_pyclone_model(
                 log_p_data,
                 priors,
                 var_params,
-                annealing_power=annealing_power,
                 convergence_threshold=convergence_threshold,
                 max_iters=max_iters,
-                num_annealing_steps=num_annealing_steps,
                 print_freq=print_freq,
             )
 

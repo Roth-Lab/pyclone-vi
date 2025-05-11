@@ -3,49 +3,7 @@ from scipy.special import gammaln as log_gamma, logsumexp, psi
 import numpy as np
 
 
-def fit_annealed(
-    log_p_data: np.ndarray,
-    priors: Priors,
-    var_params: VariationalParameters,
-    annealing_power=1.0,
-    convergence_threshold=1e-6,
-    max_iters=int(1e4),
-    num_annealing_steps=10,
-    print_freq=100,
-):
-    if num_annealing_steps == 1:
-        annealing_ladder = [1.0]
-
-    else:
-        annealing_ladder = np.linspace(0, 1.0, num_annealing_steps) ** annealing_power
-
-    elbo_trace = []
-
-    for t in annealing_ladder:
-        print("Setting annealing factor to : {}".format(t))
-        print()
-
-        log_p_data_annealed = t * log_p_data
-
-        if t == 1.0:
-            convergence_threshold_t = convergence_threshold
-
-        else:
-            convergence_threshold_t = convergence_threshold * 1e-2
-
-        elbo_trace = fit(
-            log_p_data_annealed,
-            priors,
-            var_params,
-            convergence_threshold=convergence_threshold_t,
-            max_iters=max_iters,
-            print_freq=print_freq,
-        )
-
-    return elbo_trace
-
-
-def fit(
+def fit_pyclone_model(
     log_p_data: np.ndarray,
     priors: Priors,
     var_params: VariationalParameters,

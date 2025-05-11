@@ -20,14 +20,6 @@ import pyclone_vi.run
     help="""Path to where results will be written in HDF5 format.""",
 )
 @click.option(
-    "-a",
-    "--num-annealing-steps",
-    default=1,
-    type=int,
-    help="""Number of simulated annealing steps to use. """
-    """Default is one step i.e. not to use simulated annealing.""",
-)
-@click.option(
     "-c",
     "--num-clusters",
     default=10,
@@ -64,12 +56,6 @@ import pyclone_vi.run
     default=1,
     type=int,
     help="""Number of threads to use. Default is 1.""",
-)
-@click.option(
-    "--annealing-power",
-    default=1.0,
-    type=float,
-    help="""Exponent of entries in the annealing ladder. Default is 1.0.""",
 )
 @click.option(
     "--convergence-threshold",
@@ -118,14 +104,14 @@ def fit(**kwargs):
     "-i",
     "--in-file",
     required=True,
-    type=click.Path(exists=True, resolve_path=True),
+    type=click.Path(exists=True, resolve_path=True, readable=True),
     help="""Path to HDF5 format file produced by the `fit` command.""",
 )
 @click.option(
     "-o",
     "--out-file",
     required=True,
-    type=click.Path(resolve_path=True),
+    type=click.Path(resolve_path=True, writable=True),
     help="""Path to where results will be written in tsv format.""",
 )
 @click.option(
