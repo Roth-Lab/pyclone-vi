@@ -70,12 +70,15 @@ class VariationalParameters(object):
 
         self.pi = rng.dirichlet(ones_arr)
 
-        pre_theta = rng.gamma(1, 1, size=(num_clusters, num_dims, num_grid_points))
-        pre_theta /= pre_theta.sum(axis=2, keepdims=True)
-
-        self.theta = pre_theta
+        self.theta = self._draw_initial_theta_value(num_clusters, num_dims, num_grid_points, rng)
 
         self.z = rng.dirichlet(ones_arr, size=num_data_points)
+
+    @staticmethod
+    def _draw_initial_theta_value(num_clusters, num_dims, num_grid_points, rng):
+        pre_theta = rng.gamma(1, 1, size=(num_clusters, num_dims, num_grid_points))
+        pre_theta /= pre_theta.sum(axis=2, keepdims=True)
+        return pre_theta
 
     def update_pi(self, priors: Priors):
         self.pi = np.add(priors.pi, self.z.sum(axis=0), out=self.pi)
