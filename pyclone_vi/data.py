@@ -65,10 +65,10 @@ def load_pyclone_data(file_name):
 
 
 def _create_loaded_pyclone_data_dict(df, samples):
+    samples = pd.Index(samples, name="sample_id", dtype=df["sample_id"].dtype)
     df.set_index("sample_id", inplace=True)
     df.sort_index(inplace=True)
-    grouped = df.groupby("mutation_id", sort=False)
-    samples = pd.Index(samples, name="sample_id")
+    grouped = df.groupby("mutation_id", sort=True)
 
     data = grouped.apply(make_datapoint_from_group, samples=samples, include_groups=False)
 
