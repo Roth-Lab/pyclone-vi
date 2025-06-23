@@ -122,10 +122,10 @@ def write_results_file(in_file, out_file, compress=False):
     df = fix_cluster_ids(df)
 
     if compress:
-        df.to_csv(out_file, compression="gzip", float_format="%.4f", index=False, sep="\t")
+        df.to_csv(out_file, compression="gzip", index=False, sep="\t")
 
     else:
-        df.to_csv(out_file, float_format="%.4f", index=False, sep="\t")
+        df.to_csv(out_file, index=False, sep="\t")
 
 
 def instantiate_and_seed_RNG(seed):
