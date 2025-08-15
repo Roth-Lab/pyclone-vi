@@ -6,6 +6,7 @@ from numba import set_num_threads
 from pyclone_vi.data import load_data
 from pyclone_vi.inference import Priors, fit_pyclone_model, VariationalParameters
 from pyclone_vi.post_process import load_results_df, fix_cluster_ids
+from pathlib import Path
 
 
 def fit(
@@ -117,15 +118,27 @@ def _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors
 
 
 def write_results_file(in_file, out_file, compress=False):
+    print()
+    print("#" * 100)
+    print("PyClone-VI: Write Results File")
+    print("#" * 100)
+    print()
+
     df = load_results_df(in_file)
 
     df = fix_cluster_ids(df)
 
     if compress:
-        df.to_csv(out_file, compression="gzip", index=False, sep="\t")
+        out_path = Path(out_file)
+        if out_path.suffix != ".gz":
+            out_file = str(out_path.with_suffix(out_path.suffix + ".gz"))
+        df.to_csv(out_file, float_format="%.4f", index=False, sep="\t")
 
     else:
-        df.to_csv(out_file, index=False, sep="\t")
+        df.to_csv(out_file, float_format="%.4f", index=False, sep="\t")
+
+    print("Results table written to:\n{}\n".format(out_file))
+    print("#" * 100)
 
 
 def instantiate_and_seed_RNG(seed):
