@@ -1,5 +1,6 @@
 from collections import OrderedDict
-from numba import njit, prange, int64, float64
+from numba import njit, int64, float64
+from numba.typed import List
 
 from numba.experimental import jitclass
 import numpy as np
@@ -194,22 +195,20 @@ class DataPoint(object):
         return self.sample_data_points.to_dict(into=OrderedDict)
 
     def to_likelihood_grid(self, density, num_grid_points, precision=200):
-        grid = self.get_ccf_grid(num_grid_points)
+        ccf_grid = self.get_ccf_grid(num_grid_points)
+
+        shape = (len(self.samples), num_grid_points)
+
+        log_ll = np.empty(shape, dtype=np.float64, order="C")
+        sample_data_points = self.sample_data_points
 
         if density == "beta-binomial":
-            grid_res = self.sample_data_points.apply(
-                log_pyclone_beta_binomial_pdf_grid_helper,
-                args=(grid, precision, num_grid_points),
-            )
+            _compute_beta_binomial_likelihood_grid(ccf_grid, log_ll, precision, List(sample_data_points))
         elif density == "binomial":
-            grid_res = self.sample_data_points.apply(
-                log_pyclone_binomial_pdf_grid_helper,
-                args=(grid, num_grid_points),
-            )
+            _compute_binomial_likelihood_grid(ccf_grid, log_ll, List(sample_data_points))
         else:
             raise NotImplemented("Unknown density: {}".format(density))
 
-        log_ll = grid_res.to_numpy(dtype=np.dtype((np.float64, num_grid_points)))
         return log_ll
 
 
@@ -233,28 +232,18 @@ class SampleDataPoint(object):
         self.t = t
 
 
-def log_pyclone_beta_binomial_pdf_grid_helper(data_point, grid, precision, num_grid_points):
-    log_ll = np.empty(num_grid_points, dtype=np.float64, order="C")
-    log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision, log_ll)
-    return log_ll
+@njit
+def _compute_binomial_likelihood_grid(ccf_grid, log_ll, sample_data_points):
+    for s_idx, data_point in enumerate(sample_data_points):
+        for i, ccf in enumerate(ccf_grid):
+            log_ll[s_idx, i] = log_pyclone_binomial_pdf(data_point, ccf)
 
 
-def log_pyclone_binomial_pdf_grid_helper(data_point, grid, num_grid_points):
-    log_ll = np.empty(num_grid_points, dtype=np.float64, order="C")
-    log_pyclone_binomial_pdf_grid(data_point, grid, log_ll)
-    return log_ll
-
-
-@njit(parallel=True)
-def log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision, log_ll):
-    for i in prange(len(grid)):
-        log_ll[i] = log_pyclone_beta_binomial_pdf(data_point, grid[i], precision)
-
-
-@njit(parallel=True)
-def log_pyclone_binomial_pdf_grid(data_point, grid, log_ll):
-    for i in prange(len(grid)):
-        log_ll[i] = log_pyclone_binomial_pdf(data_point, grid[i])
+@njit
+def _compute_beta_binomial_likelihood_grid(ccf_grid, log_ll, precision, sample_data_points):
+    for s_idx, data_point in enumerate(sample_data_points):
+        for i, ccf in enumerate(ccf_grid):
+            log_ll[s_idx, i] = log_pyclone_beta_binomial_pdf(data_point, ccf, precision)
 
 
 @njit
