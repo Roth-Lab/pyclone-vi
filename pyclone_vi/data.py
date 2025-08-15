@@ -173,6 +173,10 @@ def get_major_cn_prior(major_cn, minor_cn, normal_cn, error_rate=1e-3):
     log_pi_val = -np.log(len(cn))
     log_pi = np.full(len(cn), log_pi_val)
 
+    cn.setflags(write=False)
+    mu.setflags(write=False)
+    log_pi.setflags(write=False)
+
     return cn, mu, log_pi
 
 

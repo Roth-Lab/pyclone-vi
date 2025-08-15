@@ -54,6 +54,13 @@ class Priors(object):
 
         self.pi_log_gamma = log_gamma(self.pi.sum()) - log_gamma(self.pi).sum()
 
+        self._make_prior_arrays_read_only()
+
+    def _make_prior_arrays_read_only(self):
+        self.pi.setflags(write=False)
+        self.theta.setflags(write=False)
+        self.log_theta.setflags(write=False)
+
 
 class VariationalParameters(object):
     __slots__ = "pi", "theta", "z"
