@@ -29,7 +29,7 @@ def fit(
 
     rng = instantiate_and_seed_RNG(seed)
 
-    print_welcome_message(
+    seed_val = print_welcome_message(
         num_restarts,
         density,
         num_threads,
@@ -95,10 +95,10 @@ def fit(
     print("Final ELBO: {}".format(elbo_trace[-1]))
     print("Number of clusters used: {}".format(len(set(var_params.z.argmax(axis=1)))))
 
-    _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params)
+    _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params, seed_val)
 
 
-def _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params):
+def _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params, seed_val):
     with h5py.File(out_file, "w") as fh:
         fh.create_dataset(
             "/data/mutations",
@@ -123,6 +123,8 @@ def _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors
         fh.create_dataset("/var_params/z", data=var_params.z)
 
         fh.create_dataset("/stats/elbo", data=np.array(elbo_trace))
+
+        fh.attrs["seed"] = str(seed_val)
 
 
 def write_results_file(in_file, out_file, compress=False):
@@ -181,9 +183,13 @@ def print_welcome_message(
     print("Number of threads: {}".format(num_threads))
     if seed is not None:
         seed_msg = "(user-provided)"
+        seed_ret = rng.bit_generator.seed_seq.entropy
+        assert seed_ret == seed
     else:
         seed_msg = "(machine-entropy)"
+        seed_ret = rng.bit_generator.seed_seq.entropy
     print("Random seed: {} {}".format(rng.bit_generator.seed_seq.entropy, seed_msg))
     print()
     print("#" * 100)
     print()
+    return seed_ret
