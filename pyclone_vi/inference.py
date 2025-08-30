@@ -4,7 +4,6 @@ import numpy as np
 
 
 def fit_pyclone_model(
-    log_p_data: np.ndarray,
     priors: Priors,
     var_params: VariationalParameters,
     data_preproc: DataPreprocessor,
@@ -43,20 +42,18 @@ def fit_pyclone_model(
 
 
 class DataPreprocessor:
-    __slots__ = "theta_update_data", "log_p_data", "z_update_data", "theta_update_shape", "z_update_shape"
+    __slots__ = "theta_update_data", "z_update_data", "theta_update_shape", "z_update_shape"
 
     def __init__(self, log_p_data):
-        self.log_p_data = log_p_data
-
-        self.theta_update_data = self._reshape_data_for_inference([0, 1, 2])
-        self.z_update_data = self._reshape_data_for_inference([0, 2, 1])
+        self.theta_update_data = self._reshape_data_for_inference(log_p_data, [0, 1, 2])
+        self.z_update_data = self._reshape_data_for_inference(log_p_data, [0, 2, 1])
 
         self.theta_update_shape = log_p_data.shape[1], log_p_data.shape[2]
 
         self.z_update_shape = log_p_data.shape[0]
 
-    def _reshape_data_for_inference(self, axis_order: list[int]) -> np.ndarray:
-        log_p_data = self.log_p_data
+    @staticmethod
+    def _reshape_data_for_inference(log_p_data, axis_order: list[int]) -> np.ndarray:
         new_axes_order = axis_order
         contraction_axis_size = log_p_data.shape[2] * log_p_data.shape[1]
         new_shape = [log_p_data.shape[0], contraction_axis_size]

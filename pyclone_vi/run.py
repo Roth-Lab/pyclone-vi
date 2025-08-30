@@ -64,7 +64,7 @@ def fit(
                 rng,
             )
 
-            elbo_trace = fit_pyclone_model(log_p_data, priors, var_params, data_preproc,
+            elbo_trace = fit_pyclone_model(priors, var_params, data_preproc,
                                            convergence_threshold=convergence_threshold, max_iters=max_iters,
                                            print_freq=print_freq)
 
