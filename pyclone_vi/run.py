@@ -44,11 +44,12 @@ def fit(
 
     priors = Priors(num_clusters, num_grid_points, mix_weight_prior)
 
-    run_var_params_setup_dict = {"num_clusters": len(priors.pi),
-                                 "num_data_points": log_p_data.shape[0],
-                                 "num_dims": log_p_data.shape[1],
-                                 "num_grid_points": log_p_data.shape[2],
-                                 }
+    run_var_params_setup_dict = {
+        "num_clusters": len(priors.pi),
+        "num_data_points": log_p_data.shape[0],
+        "num_dims": log_p_data.shape[1],
+        "num_grid_points": log_p_data.shape[2],
+    }
 
     data_preproc = DataPreprocessor(log_p_data)
 

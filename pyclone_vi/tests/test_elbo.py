@@ -11,9 +11,7 @@ def compute_e_log_q_old(var_params):
 
     log_p += log_gamma(np.sum(var_params.pi)) - np.sum(log_gamma(var_params.pi))
 
-    log_p += np.sum(
-        (var_params.pi - 1) * (psi(var_params.pi) - psi(np.sum(var_params.pi)))
-    )
+    log_p += np.sum((var_params.pi - 1) * (psi(var_params.pi) - psi(np.sum(var_params.pi))))
 
     log_p += np.sum(var_params.theta * np.log(var_params.theta + 1e-6))
 
@@ -21,23 +19,20 @@ def compute_e_log_q_old(var_params):
 
     return log_p
 
+
 def compute_e_log_p_old(log_p_data, priors, var_params):
     log_p = 0
 
     log_p += log_gamma(np.sum(priors.pi)) - np.sum(log_gamma(priors.pi))
 
-    log_p += np.sum(
-        (priors.pi + np.sum(var_params.z, axis=0) - 1)
-        * (psi(var_params.pi) - psi(np.sum(var_params.pi)))
-    )
+    log_p += np.sum((priors.pi + np.sum(var_params.z, axis=0) - 1) * (psi(var_params.pi) - psi(np.sum(var_params.pi))))
 
     log_p += np.sum(var_params.theta * np.log(priors.theta)[np.newaxis, np.newaxis, :])
 
-    log_p += np.sum(
-        var_params.z * compute_log_p_data_theta(log_p_data, var_params.theta)
-    )
+    log_p += np.sum(var_params.z * compute_log_p_data_theta(log_p_data, var_params.theta))
 
     return log_p
+
 
 @njit(parallel=True)
 def compute_log_p_data_theta(log_p_data, theta):
@@ -66,7 +61,6 @@ class TestComputeELogQ(unittest.TestCase):
         self.rng_seed = 242643578967193853558243570818064774262
 
         self.rng = None
-
 
     def setUp(self) -> None:
         self.rng = np.random.default_rng(self.rng_seed)
@@ -123,9 +117,12 @@ class TestComputeELogP(unittest.TestCase):
 
     def create_log_p_data(self, depth, num_data_points, num_dims, num_grid_points):
         p_grid = np.full(num_dims, 1.0)
-        generator_exp = (simulate_binomial_data_point(depth, p_grid, self.rng, num_grid_points) for _ in range(num_data_points))
-        log_p_data = np.fromiter(generator_exp, dtype=np.dtype((np.float64, (num_dims, num_grid_points))),
-                                 count=num_data_points)
+        generator_exp = (
+            simulate_binomial_data_point(depth, p_grid, self.rng, num_grid_points) for _ in range(num_data_points)
+        )
+        log_p_data = np.fromiter(
+            generator_exp, dtype=np.dtype((np.float64, (num_dims, num_grid_points))), count=num_data_points
+        )
         return log_p_data
 
     def test_compute_e_log_p_small(self):
@@ -149,8 +146,6 @@ class TestComputeELogP(unittest.TestCase):
         log_p_data = self.create_log_p_data(depth, num_data_points, num_dims, num_grid_points)
 
         self.run_test(num_clusters, num_data_points, num_dims, num_grid_points, log_p_data)
-
-
 
 
 if __name__ == "__main__":
