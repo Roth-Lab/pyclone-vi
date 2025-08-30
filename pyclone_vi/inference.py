@@ -7,11 +7,12 @@ def fit_pyclone_model(
     log_p_data: np.ndarray,
     priors: Priors,
     var_params: VariationalParameters,
+    data_preproc: DataPreprocessor,
     convergence_threshold=1e-6,
     max_iters=int(1e4),
     print_freq=100,
 ):
-    elbo_trace = [compute_elbo(log_p_data, priors, var_params)]
+    elbo_trace = [compute_elbo(priors, var_params, data_preproc)]
 
     for i in range(max_iters):
         if i % print_freq == 0:
@@ -21,13 +22,13 @@ def fit_pyclone_model(
             print("Number of clusters used: {}".format(num_clusters))
             print()
 
-        var_params.update_z(log_p_data)
+        var_params.update_z(data_preproc)
 
         var_params.update_pi(priors)
 
-        var_params.update_theta(log_p_data, priors)
+        var_params.update_theta(priors, data_preproc)
 
-        curr_elbo = compute_elbo(log_p_data, priors, var_params)
+        curr_elbo = compute_elbo(priors, var_params, data_preproc)
 
         prev_elbo = elbo_trace[-1]
 
@@ -39,6 +40,28 @@ def fit_pyclone_model(
             break
 
     return elbo_trace
+
+
+class DataPreprocessor:
+    __slots__ = "theta_update_data", "log_p_data", "z_update_data", "theta_update_shape", "z_update_shape"
+
+    def __init__(self, log_p_data):
+        self.log_p_data = log_p_data
+
+        self.theta_update_data = self.reshape_data_for_inference([0, 1, 2])
+        self.z_update_data = self.reshape_data_for_inference([0, 2, 1])
+
+        self.theta_update_shape = log_p_data.shape[1], log_p_data.shape[2]
+
+        self.z_update_shape = log_p_data.shape[0]
+
+    def reshape_data_for_inference(self, axis_order: list[int]) -> np.ndarray:
+        log_p_data = self.log_p_data
+        new_axes_order = axis_order
+        contraction_axis_size = log_p_data.shape[2] * log_p_data.shape[1]
+        new_shape = [log_p_data.shape[0], contraction_axis_size]
+        reshaped_data_arr = log_p_data.transpose(new_axes_order).reshape(new_shape)
+        return reshaped_data_arr
 
 
 class Priors(object):
@@ -90,8 +113,8 @@ class VariationalParameters(object):
     def update_pi(self, priors: Priors):
         self.pi = np.add(priors.pi, self.z.sum(axis=0), out=self.pi)
 
-    def update_z(self, log_p_data):
-        new_z = get_log_p_data_theta(log_p_data, self.theta)
+    def update_z(self, data_preproc: DataPreprocessor):
+        new_z = get_log_p_data_theta(self.theta, data_preproc)
 
         psi_term = psi(self.pi)
         psi_term -= psi(self.pi.sum())
@@ -102,9 +125,10 @@ class VariationalParameters(object):
 
         self.z = np.exp(new_z, order="C", out=self.z)
 
-    def update_theta(self, log_p_data, priors: Priors):
+    def update_theta(self, priors: Priors, data_preproc: DataPreprocessor):
 
-        log_p_data_z = np.tensordot(self.z, log_p_data, axes=([0], [0]))
+        log_p_data_z = np.dot(self.z.transpose([1, 0]).reshape(self.z.shape[1], self.z.shape[0]), data_preproc.theta_update_data)
+        log_p_data_z = log_p_data_z.reshape(self.z.shape[1], *data_preproc.theta_update_shape)
 
         log_p_data_z += priors.log_theta
 
@@ -112,11 +136,11 @@ class VariationalParameters(object):
         self.theta = np.exp(log_p_data_z, order="C", out=self.theta)
 
 
-def compute_elbo(log_p_data, priors: Priors, var_params: VariationalParameters):
-    return compute_e_log_p(log_p_data, priors, var_params) - compute_e_log_q(var_params)
+def compute_elbo(priors: Priors, var_params: VariationalParameters, data_preproc: DataPreprocessor):
+    return compute_e_log_p(priors, var_params, data_preproc) - compute_e_log_q(var_params)
 
 
-def compute_e_log_p(log_p_data, priors: Priors, var_params: VariationalParameters):
+def compute_e_log_p(priors: Priors, var_params: VariationalParameters, data_preproc: DataPreprocessor):
     log_p = priors.pi_log_gamma
 
     p_pi_z_term = priors.pi + var_params.z.sum(axis=0)
@@ -131,7 +155,7 @@ def compute_e_log_p(log_p_data, priors: Priors, var_params: VariationalParameter
 
     log_p += (var_params.theta * priors.log_theta).sum()
 
-    log_p_data_theta = get_log_p_data_theta(log_p_data, var_params.theta)
+    log_p_data_theta = get_log_p_data_theta(var_params.theta, data_preproc)
 
     log_p_data_theta *= var_params.z
 
@@ -140,8 +164,16 @@ def compute_e_log_p(log_p_data, priors: Priors, var_params: VariationalParameter
     return log_p
 
 
-def get_log_p_data_theta(log_p_data, theta):
-    log_p_data_theta = np.tensordot(log_p_data, theta, axes=([2, 1], [2, 1]))
+def get_log_p_data_theta(theta, data_preproc: DataPreprocessor):
+
+    new_axes_order = [2, 1, 0]
+    contraction_axis_size = theta.shape[2] * theta.shape[1]
+    new_shape = [contraction_axis_size, theta.shape[0]]
+    reshaped_theta_arr = theta.transpose(new_axes_order).reshape(new_shape)
+
+    log_p_data_theta = np.dot(data_preproc.z_update_data, reshaped_theta_arr)
+    log_p_data_theta = log_p_data_theta.reshape(data_preproc.z_update_shape, theta.shape[0])
+
     return log_p_data_theta
 
 
@@ -154,7 +186,7 @@ def compute_e_log_q(var_params: VariationalParameters):
 
     pi_psi_term = psi(var_params.pi)
     pi_psi_term -= psi(pi_sum)
-    pi_psi_term *= (var_params.pi - 1)
+    pi_psi_term *= var_params.pi - 1
     pi_psi_term = np.asarray(pi_psi_term)
 
     log_p += pi_psi_term.sum()

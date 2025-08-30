@@ -30,6 +30,8 @@ def load_data(file_name, density="binomial", num_grid_points=100, precision=200)
     print("#" * 100)
     print()
 
+    log_p_data.setflags(write=False)
+
     return log_p_data, mutations, samples
 
 

@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from scipy.special import gammaln as log_gamma, psi
-from pyclone_vi.inference import compute_e_log_q, VariationalParameters, compute_e_log_p, Priors
+from pyclone_vi.inference import compute_e_log_q, VariationalParameters, compute_e_log_p, Priors, DataPreprocessor
 from pyclone_vi.tests.simulate import simulate_binomial_data_point
 from numba import njit, prange, set_num_threads
 
@@ -115,7 +115,8 @@ class TestComputeELogP(unittest.TestCase):
         priors = Priors(num_clusters, num_grid_points, 1.0)
         var_params = VariationalParameters(num_clusters, num_data_points, num_dims, num_grid_points, self.rng)
         expected = compute_e_log_p_old(log_p_data, priors, var_params)
-        actual = compute_e_log_p(log_p_data, priors, var_params)
+        data_preproc = DataPreprocessor(log_p_data)
+        actual = compute_e_log_p(priors, var_params, data_preproc)
         print("Expected = ", expected)
         print("Actual = ", actual)
         np.testing.assert_almost_equal(actual, expected)

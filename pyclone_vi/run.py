@@ -4,7 +4,7 @@ import numpy as np
 from numba import set_num_threads
 
 from pyclone_vi.data import load_data
-from pyclone_vi.inference import Priors, fit_pyclone_model, VariationalParameters
+from pyclone_vi.inference import Priors, fit_pyclone_model, VariationalParameters, DataPreprocessor
 from pyclone_vi.post_process import load_results_df, fix_cluster_ids
 from pathlib import Path
 
@@ -50,6 +50,8 @@ def fit(
 
     priors = Priors(num_clusters, num_grid_points, mix_weight_prior)
 
+    data_preproc = DataPreprocessor(log_p_data)
+
     with threadpool_limits(limits=num_threads, user_api="blas"):
         for i in range(num_restarts):
             print("Performing restart {}".format(i))
@@ -62,14 +64,9 @@ def fit(
                 rng,
             )
 
-            elbo_trace = fit_pyclone_model(
-                log_p_data,
-                priors,
-                var_params,
-                convergence_threshold=convergence_threshold,
-                max_iters=max_iters,
-                print_freq=print_freq,
-            )
+            elbo_trace = fit_pyclone_model(log_p_data, priors, var_params, data_preproc,
+                                           convergence_threshold=convergence_threshold, max_iters=max_iters,
+                                           print_freq=print_freq)
 
             if elbo_trace[-1] > best_elbo:
                 best_elbo = elbo_trace[-1]
