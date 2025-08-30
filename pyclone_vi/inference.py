@@ -48,19 +48,20 @@ class DataPreprocessor:
     def __init__(self, log_p_data):
         self.log_p_data = log_p_data
 
-        self.theta_update_data = self.reshape_data_for_inference([0, 1, 2])
-        self.z_update_data = self.reshape_data_for_inference([0, 2, 1])
+        self.theta_update_data = self._reshape_data_for_inference([0, 1, 2])
+        self.z_update_data = self._reshape_data_for_inference([0, 2, 1])
 
         self.theta_update_shape = log_p_data.shape[1], log_p_data.shape[2]
 
         self.z_update_shape = log_p_data.shape[0]
 
-    def reshape_data_for_inference(self, axis_order: list[int]) -> np.ndarray:
+    def _reshape_data_for_inference(self, axis_order: list[int]) -> np.ndarray:
         log_p_data = self.log_p_data
         new_axes_order = axis_order
         contraction_axis_size = log_p_data.shape[2] * log_p_data.shape[1]
         new_shape = [log_p_data.shape[0], contraction_axis_size]
         reshaped_data_arr = log_p_data.transpose(new_axes_order).reshape(new_shape)
+        reshaped_data_arr.setflags(write=False)
         return reshaped_data_arr
 
 
@@ -127,7 +128,8 @@ class VariationalParameters(object):
 
     def update_theta(self, priors: Priors, data_preproc: DataPreprocessor):
 
-        log_p_data_z = np.dot(self.z.transpose([1, 0]).reshape(self.z.shape[1], self.z.shape[0]), data_preproc.theta_update_data)
+        reshaped_z = self.z.transpose([1, 0]).reshape(self.z.shape[1], self.z.shape[0])
+        log_p_data_z = np.dot(reshaped_z, data_preproc.theta_update_data)
         log_p_data_z = log_p_data_z.reshape(self.z.shape[1], *data_preproc.theta_update_shape)
 
         log_p_data_z += priors.log_theta
@@ -168,8 +170,8 @@ def get_log_p_data_theta(theta, data_preproc: DataPreprocessor):
 
     new_axes_order = [2, 1, 0]
     contraction_axis_size = theta.shape[2] * theta.shape[1]
-    new_shape = [contraction_axis_size, theta.shape[0]]
-    reshaped_theta_arr = theta.transpose(new_axes_order).reshape(new_shape)
+    new_theta_shape = [contraction_axis_size, theta.shape[0]]
+    reshaped_theta_arr = theta.transpose(new_axes_order).reshape(new_theta_shape)
 
     log_p_data_theta = np.dot(data_preproc.z_update_data, reshaped_theta_arr)
     log_p_data_theta = log_p_data_theta.reshape(data_preproc.z_update_shape, theta.shape[0])
