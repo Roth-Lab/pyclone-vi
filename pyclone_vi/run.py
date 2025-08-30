@@ -42,31 +42,42 @@ def fit(
 
     log_p_data, mutations, samples = load_data(in_file, density, num_grid_points, precision=precision)
 
+    priors = Priors(num_clusters, num_grid_points, mix_weight_prior)
+
+    run_var_params_setup_dict = {"num_clusters": len(priors.pi),
+                                 "num_data_points": log_p_data.shape[0],
+                                 "num_dims": log_p_data.shape[1],
+                                 "num_grid_points": log_p_data.shape[2],
+                                 }
+
+    data_preproc = DataPreprocessor(log_p_data)
+
     best_elbo = float("-inf")
 
     result = None
 
     print("Running PyClone-VI:\n")
 
-    priors = Priors(num_clusters, num_grid_points, mix_weight_prior)
-
-    data_preproc = DataPreprocessor(log_p_data)
-
     with threadpool_limits(limits=num_threads, user_api="blas"):
         for i in range(num_restarts):
             print("Performing restart {}".format(i))
 
             var_params = VariationalParameters(
-                len(priors.pi),
-                log_p_data.shape[0],
-                log_p_data.shape[1],
-                log_p_data.shape[2],
+                run_var_params_setup_dict["num_clusters"],
+                run_var_params_setup_dict["num_data_points"],
+                run_var_params_setup_dict["num_dims"],
+                run_var_params_setup_dict["num_grid_points"],
                 rng,
             )
 
-            elbo_trace = fit_pyclone_model(priors, var_params, data_preproc,
-                                           convergence_threshold=convergence_threshold, max_iters=max_iters,
-                                           print_freq=print_freq)
+            elbo_trace = fit_pyclone_model(
+                priors,
+                var_params,
+                data_preproc,
+                convergence_threshold=convergence_threshold,
+                max_iters=max_iters,
+                print_freq=print_freq,
+            )
 
             if elbo_trace[-1] > best_elbo:
                 best_elbo = elbo_trace[-1]
