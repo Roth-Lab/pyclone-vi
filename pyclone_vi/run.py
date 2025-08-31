@@ -182,14 +182,13 @@ def print_welcome_message(
     print("Number of CCF approximation grid points: {}".format(num_grid_points))
     print("Mix weight prior: {}".format(mix_weight_prior))
     print("Number of threads: {}".format(num_threads))
+    seed_ret = rng.bit_generator.seed_seq.entropy
     if seed is not None:
         seed_msg = "(user-provided)"
-        seed_ret = rng.bit_generator.seed_seq.entropy
         assert seed_ret == seed
     else:
         seed_msg = "(machine-entropy)"
-        seed_ret = rng.bit_generator.seed_seq.entropy
-    print("Random seed: {} {}".format(rng.bit_generator.seed_seq.entropy, seed_msg))
+    print("Random seed: {} {}".format(seed_ret, seed_msg))
     print()
     print("#" * 100)
     print()
