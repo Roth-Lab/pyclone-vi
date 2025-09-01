@@ -10,6 +10,7 @@ authors = [
     {name = "Andrew Roth", email = "aroth@bccrc.ca"}
 ]
 maintainers = [
+    {name = "Emilia Hurtado", email = "ehurtado@bccrc.ca"},
     {name = "Andrew Roth", email = "aroth@bccrc.ca"}
 ]
 readme = "README.md"
@@ -34,6 +35,7 @@ classifiers = [
 [project.urls]
 Repository = "https://github.com/Roth-Lab/pyclone-vi.git"
 Homepage = "https://github.com/Roth-Lab/pyclone-vi"
+DOI = "https://doi.org/10.1186/s12859-020-03919-2"
 
 [project.scripts]
 pyclone-vi = "pyclone_vi.cli:main"

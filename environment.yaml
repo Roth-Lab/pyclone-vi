@@ -1,0 +1,14 @@
+channels:
+  - numba
+  - conda-forge
+  - bioconda
+dependencies:
+  - python>=3.12
+  - numba::llvmlite
+  - numpy>=1.26.4
+  - numba>=0.61.2
+  - click>=8.0
+  - scipy
+  - pandas>=2.2.2
+  - h5py>=3.0
+  - threadpoolctl>=3.6.0
