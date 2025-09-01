@@ -92,9 +92,8 @@ class TestVariationalParameterUpdates(unittest.TestCase):
         self.rng = np.random.default_rng(self.rng_seed)
 
     def create_log_p_data(self, depth, num_data_points, num_dims, num_grid_points):
-        p_grid = np.full(num_dims, 1.0)
         generator_exp = (
-            simulate_binomial_data_point(depth, p_grid, self.rng, num_grid_points) for _ in range(num_data_points)
+            simulate_binomial_data_point(depth, self.rng.random(num_dims), self.rng, num_grid_points) for _ in range(num_data_points)
         )
         log_p_data = np.fromiter(
             generator_exp,
