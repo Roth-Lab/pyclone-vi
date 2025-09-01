@@ -113,7 +113,8 @@ class TestComputeELogP(unittest.TestCase):
         actual = compute_e_log_p(priors, var_params, data_preproc)
         print("Expected = ", expected)
         print("Actual = ", actual)
-        np.testing.assert_almost_equal(actual, expected)
+        self.assertAlmostEqual(expected, actual)
+        # np.testing.assert_almost_equal(actual, expected)
 
     def create_log_p_data(self, depth, num_data_points, num_dims, num_grid_points):
         p_grid = np.full(num_dims, 1.0)
@@ -121,7 +122,9 @@ class TestComputeELogP(unittest.TestCase):
             simulate_binomial_data_point(depth, p_grid, self.rng, num_grid_points) for _ in range(num_data_points)
         )
         log_p_data = np.fromiter(
-            generator_exp, dtype=np.dtype((np.float64, (num_dims, num_grid_points))), count=num_data_points
+            generator_exp,
+            dtype=np.dtype((np.float64, (num_dims, num_grid_points))),
+            count=num_data_points,
         )
         return log_p_data
 
