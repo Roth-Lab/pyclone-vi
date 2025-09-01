@@ -41,10 +41,10 @@ def fit_pyclone_model(
     return elbo_trace
 
 
-class DataPreprocessor:
+class DataPreprocessor(object):
     __slots__ = "theta_update_data", "z_update_data", "theta_update_shape", "z_update_shape"
 
-    def __init__(self, log_p_data):
+    def __init__(self, log_p_data: np.ndarray):
         self.theta_update_data = self._reshape_data_for_inference(log_p_data, [0, 1, 2])
         self.z_update_data = self._reshape_data_for_inference(log_p_data, [0, 2, 1])
 
@@ -53,7 +53,7 @@ class DataPreprocessor:
         self.z_update_shape = log_p_data.shape[0]
 
     @staticmethod
-    def _reshape_data_for_inference(log_p_data, axis_order: list[int]) -> np.ndarray:
+    def _reshape_data_for_inference(log_p_data: np.ndarray, axis_order: list[int]) -> np.ndarray:
         new_axes_order = axis_order
         contraction_axis_size = log_p_data.shape[2] * log_p_data.shape[1]
         new_shape = [log_p_data.shape[0], contraction_axis_size]
@@ -103,7 +103,7 @@ class VariationalParameters(object):
         self.z = rng.dirichlet(ones_arr, size=num_data_points)
 
     @staticmethod
-    def _draw_initial_theta_value(num_clusters, num_dims, num_grid_points, rng):
+    def _draw_initial_theta_value(num_clusters: int, num_dims: int, num_grid_points: int, rng: np.random.Generator):
         pre_theta = rng.gamma(1, 1, size=(num_clusters, num_dims, num_grid_points))
         pre_theta /= pre_theta.sum(axis=2, keepdims=True)
         return pre_theta
@@ -163,7 +163,7 @@ def compute_e_log_p(priors: Priors, var_params: VariationalParameters, data_prep
     return log_p
 
 
-def get_log_p_data_theta(theta, data_preproc: DataPreprocessor):
+def get_log_p_data_theta(theta: np.ndarray, data_preproc: DataPreprocessor):
 
     new_axes_order = [2, 1, 0]
     contraction_axis_size = theta.shape[2] * theta.shape[1]
