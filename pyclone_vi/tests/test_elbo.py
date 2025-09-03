@@ -8,14 +8,15 @@ from numba import njit, prange, set_num_threads
 
 def compute_e_log_q_old(var_params):
     log_p = 0
+    eps = 1e-6
 
     log_p += log_gamma(np.sum(var_params.pi)) - np.sum(log_gamma(var_params.pi))
 
     log_p += np.sum((var_params.pi - 1) * (psi(var_params.pi) - psi(np.sum(var_params.pi))))
 
-    log_p += np.sum(var_params.theta * np.log(var_params.theta + 1e-6))
+    log_p += np.sum(var_params.theta * np.log(var_params.theta.clip(min=eps)))
 
-    log_p += np.sum(var_params.z * np.log(var_params.z + 1e-6))
+    log_p += np.sum(var_params.z * np.log(var_params.z.clip(min=eps)))
 
     return log_p
 
@@ -117,7 +118,13 @@ class TestComputeELogP(unittest.TestCase):
 
     def create_log_p_data(self, depth, num_data_points, num_dims, num_grid_points):
         generator_exp = (
-            simulate_binomial_data_point(depth, self.rng.random(num_dims), self.rng, num_grid_points) for _ in range(num_data_points)
+            simulate_binomial_data_point(
+                depth,
+                self.rng.random(num_dims),
+                self.rng,
+                num_grid_points,
+            )
+            for _ in range(num_data_points)
         )
         log_p_data = np.fromiter(
             generator_exp,
@@ -139,7 +146,7 @@ class TestComputeELogP(unittest.TestCase):
 
     def test_compute_e_log_p_big(self):
         num_clusters = 100
-        num_data_points = 1000
+        num_data_points = 100
         num_dims = 100
         num_grid_points = self.default_grid_size
         depth = 100

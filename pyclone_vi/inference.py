@@ -190,12 +190,14 @@ def compute_e_log_q(var_params: VariationalParameters, eps=1e-6):
 
     log_p += pi_psi_term.sum()
 
-    theta_term = np.log(var_params.theta + eps)
+    theta_term = var_params.theta.clip(min=eps)
+    theta_term = np.log(theta_term)
     theta_term *= var_params.theta
 
     log_p += theta_term.sum()
 
-    z_term = np.log(var_params.z + eps)
+    z_term = var_params.z.clip(min=eps)
+    z_term = np.log(z_term)
     z_term *= var_params.z
 
     log_p += z_term.sum()
