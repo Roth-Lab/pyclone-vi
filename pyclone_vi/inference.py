@@ -176,7 +176,7 @@ def get_log_p_data_theta(theta: np.ndarray, data_preproc: DataPreprocessor):
     return log_p_data_theta
 
 
-def compute_e_log_q(var_params: VariationalParameters):
+def compute_e_log_q(var_params: VariationalParameters, eps=1e-6):
     log_p = 0.0
 
     pi_sum = var_params.pi.sum()
@@ -190,12 +190,12 @@ def compute_e_log_q(var_params: VariationalParameters):
 
     log_p += pi_psi_term.sum()
 
-    theta_term = np.log(var_params.theta + 1e-6)
+    theta_term = np.log(var_params.theta + eps)
     theta_term *= var_params.theta
 
     log_p += theta_term.sum()
 
-    z_term = np.log(var_params.z + 1e-6)
+    z_term = np.log(var_params.z + eps)
     z_term *= var_params.z
 
     log_p += z_term.sum()
