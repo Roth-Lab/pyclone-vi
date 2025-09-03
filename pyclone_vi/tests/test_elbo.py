@@ -6,9 +6,8 @@ from pyclone_vi.tests.simulate import simulate_binomial_data_point
 from numba import njit, prange, set_num_threads
 
 
-def compute_e_log_q_old(var_params):
+def compute_e_log_q_old(var_params, eps):
     log_p = 0
-    eps = 1e-6
 
     log_p += log_gamma(np.sum(var_params.pi)) - np.sum(log_gamma(var_params.pi))
 
@@ -63,13 +62,15 @@ class TestComputeELogQ(unittest.TestCase):
 
         self.rng = None
 
+        self.eps = 1e-6
+
     def setUp(self) -> None:
         self.rng = np.random.default_rng(self.rng_seed)
 
     def run_test(self, num_clusters, num_data_points, num_dims, num_grid_points):
         var_params = VariationalParameters(num_clusters, num_data_points, num_dims, num_grid_points, self.rng)
-        expected = compute_e_log_q_old(var_params)
-        actual = compute_e_log_q(var_params)
+        expected = compute_e_log_q_old(var_params, self.eps)
+        actual = compute_e_log_q(var_params, self.eps)
         print("Expected = ", expected)
         print("Actual = ", actual)
         self.assertEqual(expected, actual)
