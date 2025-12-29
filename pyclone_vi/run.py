@@ -2,10 +2,12 @@ from threadpoolctl import threadpool_limits
 import h5py
 import numpy as np
 from numba import set_num_threads
+import click
 
 from pyclone_vi.data import load_data
 from pyclone_vi.inference import Priors, fit_pyclone_model, VariationalParameters, DataPreprocessor
 from pyclone_vi.post_process import load_results_df, fix_cluster_ids
+from pyclone_vi.utils import print_command_header
 from pathlib import Path
 
 
@@ -57,11 +59,11 @@ def fit(
 
     result = None
 
-    print("Running PyClone-VI:\n")
+    click.echo("Running PyClone-VI:\n")
 
     with threadpool_limits(limits=num_threads, user_api="blas"):
         for i in range(num_restarts):
-            print("Performing restart {}".format(i))
+            click.echo("Performing restart {}".format(i))
 
             var_params = VariationalParameters(
                 run_var_params_setup_dict["num_clusters"],
@@ -85,16 +87,16 @@ def fit(
 
                 result = (elbo_trace, var_params)
 
-            print("Fitting completed")
-            print("ELBO: {}".format(elbo_trace[-1]))
-            print("Number of clusters used: {}".format(len(set(var_params.z.argmax(axis=1)))))
-            print()
+            click.echo("Fitting completed")
+            click.echo("ELBO: {}".format(elbo_trace[-1]))
+            click.echo("Number of clusters used: {}".format(len(set(var_params.z.argmax(axis=1)))))
+            click.echo()
 
     elbo_trace, var_params = result
 
-    print("All restarts completed")
-    print("Final ELBO: {}".format(elbo_trace[-1]))
-    print("Number of clusters used: {}".format(len(set(var_params.z.argmax(axis=1)))))
+    click.echo("All restarts completed")
+    click.echo("Final ELBO: {}".format(elbo_trace[-1]))
+    click.echo("Number of clusters used: {}".format(len(set(var_params.z.argmax(axis=1)))))
 
     _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params, seed_val)
 
@@ -129,11 +131,7 @@ def _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors
 
 
 def write_results_file(in_file, out_file, compress=False):
-    print()
-    print("#" * 100)
-    print("PyClone-VI: Write Results File")
-    print("#" * 100)
-    print()
+    print_command_header("Write Results File")
 
     df = load_results_df(in_file)
 
@@ -144,12 +142,11 @@ def write_results_file(in_file, out_file, compress=False):
         if out_path.suffix != ".gz":
             out_file = str(out_path.with_suffix(out_path.suffix + ".gz"))
         df.to_csv(out_file, float_format="%.4f", index=False, sep="\t")
-
     else:
         df.to_csv(out_file, float_format="%.4f", index=False, sep="\t")
 
-    print("Results table written to:\n{}\n".format(out_file))
-    print("#" * 100)
+    click.echo("Results table written to:\n{}\n".format(out_file))
+    click.echo("#" * 100)
 
 
 def instantiate_and_seed_RNG(seed):
@@ -170,26 +167,22 @@ def print_welcome_message(
     num_grid_points,
     mix_weight_prior,
 ):
-    print()
-    print("#" * 100)
-    print("PyClone-VI: Fit")
-    print("#" * 100)
-    print()
-    print("Running with the following parameters:\n")
-    print("Density: {}".format(density))
-    print("Max number of clusters: {}".format(num_clusters))
-    print("Number of random restarts: {}".format(num_restarts))
-    print("Number of CCF approximation grid points: {}".format(num_grid_points))
-    print("Mix weight prior: {}".format(mix_weight_prior))
-    print("Number of threads: {}".format(num_threads))
+    print_command_header("Fit")
+    click.echo("Running with the following parameters:\n")
+    click.echo("Density: {}".format(density))
+    click.echo("Max number of clusters: {}".format(num_clusters))
+    click.echo("Number of random restarts: {}".format(num_restarts))
+    click.echo("Number of CCF approximation grid points: {}".format(num_grid_points))
+    click.echo("Mix weight prior: {}".format(mix_weight_prior))
+    click.echo("Number of threads: {}".format(num_threads))
     seed_ret = rng.bit_generator.seed_seq.entropy
     if seed is not None:
         seed_msg = "(user-provided)"
         assert seed_ret == seed
     else:
         seed_msg = "(machine-entropy)"
-    print("Random seed: {} {}".format(seed_ret, seed_msg))
-    print()
-    print("#" * 100)
-    print()
+    click.echo("Random seed: {} {}".format(seed_ret, seed_msg))
+    click.echo()
+    click.echo("#" * 100)
+    click.echo()
     return seed_ret
