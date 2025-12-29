@@ -1,6 +1,7 @@
 from __future__ import annotations
 from scipy.special import gammaln as log_gamma, logsumexp, psi
 import numpy as np
+import click
 
 
 def fit_pyclone_model(
@@ -18,10 +19,10 @@ def fit_pyclone_model(
     for i in range(max_iters):
         if i % print_freq == 0:
             num_clusters = len(set(var_params.z.argmax(axis=1)))
-            print("Iteration: {}".format(i))
-            print("ELBO: {}".format(elbo_trace[-1]))
-            print("Number of clusters used: {}".format(num_clusters))
-            print()
+            click.echo("Iteration: {}".format(i))
+            click.echo("ELBO: {}".format(elbo_trace[-1]))
+            click.echo("Number of clusters used: {}".format(num_clusters))
+            click.echo()
 
         var_params.update_z(data_preproc)
 

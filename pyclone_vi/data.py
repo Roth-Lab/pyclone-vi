@@ -5,6 +5,7 @@ from numba.typed import List
 from numba.experimental import jitclass
 import numpy as np
 import pandas as pd
+import click
 
 from pyclone_vi.math_utils import (
     log_beta_binomial_pdf,
@@ -17,7 +18,7 @@ from functools import lru_cache
 
 def load_data(file_name, density="binomial", num_grid_points=100, precision=200):
 
-    print("Parsing Input Data...\n")
+    click.echo("Parsing Input Data...\n")
 
     data, samples = load_pyclone_data(file_name)
 
@@ -27,8 +28,8 @@ def load_data(file_name, density="binomial", num_grid_points=100, precision=200)
 
     log_p_data = log_p_data.to_numpy(dtype=np.dtype((np.float64, (len(samples), num_grid_points))))
 
-    print("#" * 100)
-    print()
+    click.echo("#" * 100)
+    click.echo()
 
     log_p_data.setflags(write=False)
 
@@ -55,14 +56,14 @@ def load_pyclone_data(file_name):
 
     get_major_cn_prior.cache_clear()
 
-    print("Num Samples: {}".format(len(samples)))
+    click.echo("Num Samples: {}".format(len(samples)))
     if len(samples) > 10:
-        print("Samples: {}...".format(" ".join(samples[:5])))
+        click.echo("Samples: {}...".format(" ".join(samples[:5])))
     else:
-        print("Samples: {}".format(" ".join(samples)))
+        click.echo("Samples: {}".format(" ".join(samples)))
 
-    print("Num Mutations: {}".format(len(data)))
-    print()
+    click.echo("Num Mutations: {}".format(len(data)))
+    click.echo()
 
     return data, samples
 
@@ -107,18 +108,18 @@ def create_sample_data_point(row_series):
 def _process_required_columns(df):
     df["sample_id"] = df["sample_id"].astype(str)
     if "error_rate" not in df.columns:
-        print("Error rate column not found, setting values to {}.\n".format(1e-3))
+        click.echo("Error rate column not found, setting values to {}.\n".format(1e-3))
         df["error_rate"] = 1e-3
 
     if "tumour_content" not in df.columns:
-        print("Tumour content column not found, setting values to 1.0.\n")
+        click.echo("Tumour content column not found, setting values to 1.0.\n")
         df["tumour_content"] = 1.0
 
 
 def _remove_cn_zero_mutations(df):
     num_dels = len(df.loc[df["major_cn"] == 0])
     if num_dels > 0:
-        print("Removing {} mutations with major copy number zero".format(num_dels))
+        click.echo("Removing {} mutations with major copy number zero".format(num_dels))
     df = df.loc[df["major_cn"] > 0]
     return df
 
@@ -133,13 +134,13 @@ def _remove_duplicated_and_partially_absent_mutations(df, samples):
             pl = ""
         else:
             pl = "s"
-        print("Removing {} duplicate mutation ID{}".format(num_duplicates, pl))
+        click.echo("Removing {} duplicate mutation ID{}".format(num_duplicates, pl))
     if num_not_present_in_all > 0:
         if num_not_present_in_all == 1:
             pl = ("", "is")
         else:
             pl = ("s", "are")
-        print(
+        click.echo(
             "Removing {} mutation{} that {} not present in all samples".format(
                 num_not_present_in_all,
                 pl[0],
@@ -149,7 +150,7 @@ def _remove_duplicated_and_partially_absent_mutations(df, samples):
     df = df.loc[group_transform == samples_len]
 
     if (num_duplicates > 0) or (num_not_present_in_all > 0):
-        print()
+        click.echo()
 
     return df
 
