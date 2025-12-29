@@ -94,7 +94,8 @@ def fit(
 
     elbo_trace, var_params = result
 
-    click.echo("All restarts completed")
+    click.echo("=" * 50)
+    click.echo("\nAll restarts completed")
     click.echo("Final ELBO: {}".format(elbo_trace[-1]))
     click.echo("Number of clusters used: {}".format(len(set(var_params.z.argmax(axis=1)))))
 
@@ -102,6 +103,9 @@ def fit(
 
 
 def _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors, samples, var_params, seed_val):
+    click.echo()
+    click.echo("Saving results")
+
     with h5py.File(out_file, "w") as fh:
         fh.create_dataset(
             "/data/mutations",
@@ -128,6 +132,8 @@ def _create_fit_results_file(elbo_trace, log_p_data, mutations, out_file, priors
         fh.create_dataset("/stats/elbo", data=np.array(elbo_trace))
 
         fh.attrs["seed"] = str(seed_val)
+
+    click.secho("\nFinished.", fg="bright_green")
 
 
 def write_results_file(in_file, out_file, compress=False):
