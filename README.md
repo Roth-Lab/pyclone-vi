@@ -1,3 +1,5 @@
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/pyclone-vi/README.html)
+
 PyClone-VI
 =========
 
@@ -19,8 +21,6 @@ Paper: [PyClone-VI: scalable inference of clonal population structures using who
 -------
 
 # Installation
-
-[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/pyclone-vi/README.html)
 
 The recommended way to install PyClone-VI is through [conda](https://github.com/conda-forge/miniforge) and the [Bioconda](https://bioconda.github.io/index.html) package channel.
 
