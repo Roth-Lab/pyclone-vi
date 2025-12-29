@@ -56,13 +56,13 @@ def load_pyclone_data(file_name):
 
     get_major_cn_prior.cache_clear()
 
-    click.echo("Num Samples: {}".format(len(samples)))
-    if len(samples) > 10:
-        click.echo("Samples: {}...".format(" ".join(samples[:5])))
-    else:
-        click.echo("Samples: {}".format(" ".join(samples)))
-
     click.echo("Num Mutations: {}".format(len(data)))
+    click.echo("Num Samples: {}".format(len(samples)))
+    if len(samples) > 6:
+        click.echo("Samples: {}...".format(", ".join(samples[:5])))
+    else:
+        click.echo("Samples: {}".format(", ".join(samples)))
+
     click.echo()
 
     return data, samples
