@@ -49,8 +49,7 @@ def _validate_nullable_positive_value(ctx, param, value):
     type=click.IntRange(2, clamp=True),
     show_default=True,
     help="""Number of clusters to use in variational approximation distribution. """
-    """Note that not all clusters may not be assigned data points, so the final number of clusters could be lower. """
-    """Default is 10.""",
+    """Note that not all clusters may not be assigned data points, so the final number of clusters could be lower."""
 )
 @click.option(
     "-d",
@@ -58,8 +57,7 @@ def _validate_nullable_positive_value(ctx, param, value):
     default="binomial",
     type=click.Choice(["beta-binomial", "binomial"]),
     show_default=True,
-    help="""Allele count density in the PyClone model. Use beta-binomial for high coverage sequencing. """
-    """Default binomial.""",
+    help="""Allele count density in the PyClone model. Use beta-binomial for high coverage sequencing."""
 )
 @click.option(
     "-g",
@@ -67,7 +65,7 @@ def _validate_nullable_positive_value(ctx, param, value):
     default=100,
     type=click.IntRange(10, clamp=True),
     show_default=True,
-    help="""Number of points used to approximate CCF values. Default is 100.""",
+    help="""Number of points used to approximate CCF values.""",
 )
 @click.option(
     "-r",
@@ -75,7 +73,7 @@ def _validate_nullable_positive_value(ctx, param, value):
     default=1,
     type=click.IntRange(1, clamp=True),
     show_default=True,
-    help="""Number of random restarts of variational inference. Default is 1.""",
+    help="""Number of random restarts of variational inference.""",
 )
 @click.option(
     "-t",
@@ -83,20 +81,22 @@ def _validate_nullable_positive_value(ctx, param, value):
     default=1,
     type=click.IntRange(1, clamp=True),
     show_default=True,
-    help="""Number of threads to use. Default is 1.""",
+    help="""Number of threads to use.""",
 )
 @click.option(
     "--convergence-threshold",
     default=1e-6,
     type=float,
-    help="""Maximum relative ELBO difference between iterations to decide on convergence. Default is 10^-6.""",
+    show_default=True,
+    callback=_validate_positive_value,
+    help="""Maximum relative ELBO difference between iterations to decide on convergence.""",
 )
 @click.option(
     "--max-iters",
     default=int(1e4),
     type=click.IntRange(1, clamp=True),
     show_default=True,
-    help="""Maximum number of ELBO optimization iterations. Default is 10,000.""",
+    help="""Maximum number of ELBO optimization iterations.""",
 )
 @click.option(
     "--mix-weight-prior",
@@ -113,14 +113,14 @@ def _validate_nullable_positive_value(ctx, param, value):
     type=float,
     show_default=True,
     callback=_validate_positive_value,
-    help="""Precision for Beta-Binomial density. Has no effect when using Binomial. Default is 200.""",
+    help="""Precision for Beta-Binomial density. Has no effect when using Binomial.""",
 )
 @click.option(
     "--print-freq",
     default=100,
     type=click.IntRange(1, clamp=True),
     show_default=True,
-    help="""How often to print information about optimization. Default is every 100 iteration.""",
+    help="""How often to print information about optimization. Default is every 100 iterations.""",
 )
 @click.option(
     "--seed",
