@@ -6,16 +6,16 @@ from pyclone_vi.tests.simulate import simulate_binomial_data_point
 from numba import njit, prange, set_num_threads
 
 
-def compute_e_log_q_old(var_params, eps):
+def compute_e_log_q_old(var_params, eps=1e-6):
     log_p = 0
 
     log_p += log_gamma(np.sum(var_params.pi)) - np.sum(log_gamma(var_params.pi))
 
     log_p += np.sum((var_params.pi - 1) * (psi(var_params.pi) - psi(np.sum(var_params.pi))))
 
-    log_p += np.sum(var_params.theta * np.log(var_params.theta.clip(min=eps)))
+    log_p += np.sum(var_params.theta * np.log(var_params.theta + eps))
 
-    log_p += np.sum(var_params.z * np.log(var_params.z.clip(min=eps)))
+    log_p += np.sum(var_params.z * np.log(var_params.z + eps))
 
     return log_p
 

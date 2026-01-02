@@ -19,9 +19,9 @@ license-files = ["LICEN[CS]E.*"]
 requires-python = ">=3.12"
 dependencies = [
     "numba>=0.61.2",
-    "numpy>=1.26.4",
+    "numpy>=2.0",
     "scipy",
-    "click>=8.0",
+    "click>=8.3",
     "pandas>=2.2.2",
     "h5py>=3.0",
     "threadpoolctl>=3.6.0"

@@ -13,8 +13,8 @@ def fit_pyclone_model(
     print_freq=100,
 ):
 
-    epsilon = 1e-6
-    elbo_trace = [compute_elbo(priors, var_params, data_preproc, epsilon)]
+    eps = 1e-6
+    elbo_trace = [compute_elbo(priors, var_params, data_preproc, eps)]
 
     for i in range(max_iters):
         if i % print_freq == 0:
@@ -30,7 +30,7 @@ def fit_pyclone_model(
 
         var_params.update_theta(priors, data_preproc)
 
-        curr_elbo = compute_elbo(priors, var_params, data_preproc, epsilon)
+        curr_elbo = compute_elbo(priors, var_params, data_preproc, eps)
 
         prev_elbo = elbo_trace[-1]
 
@@ -138,8 +138,8 @@ class VariationalParameters(object):
         self.theta = np.exp(log_p_data_z, order="C", out=self.theta)
 
 
-def compute_elbo(priors: Priors, var_params: VariationalParameters, data_preproc: DataPreprocessor, epsilon: float):
-    return compute_e_log_p(priors, var_params, data_preproc) - compute_e_log_q(var_params, epsilon)
+def compute_elbo(priors: Priors, var_params: VariationalParameters, data_preproc: DataPreprocessor, eps: float):
+    return compute_e_log_p(priors, var_params, data_preproc) - compute_e_log_q(var_params, eps)
 
 
 def compute_e_log_p(priors: Priors, var_params: VariationalParameters, data_preproc: DataPreprocessor):
@@ -179,7 +179,7 @@ def get_log_p_data_theta(theta: np.ndarray, data_preproc: DataPreprocessor):
     return log_p_data_theta
 
 
-def compute_e_log_q(var_params: VariationalParameters, epsilon: float):
+def compute_e_log_q(var_params: VariationalParameters, eps: float):
     log_p = 0.0
 
     pi_sum = var_params.pi.sum()
@@ -193,13 +193,13 @@ def compute_e_log_q(var_params: VariationalParameters, epsilon: float):
 
     log_p += pi_psi_term.sum()
 
-    theta_term = var_params.theta.clip(min=epsilon)
+    theta_term = var_params.theta + eps
     theta_term = np.log(theta_term)
     theta_term *= var_params.theta
 
     log_p += theta_term.sum()
 
-    z_term = var_params.z.clip(min=epsilon)
+    z_term = var_params.z + eps
     z_term = np.log(z_term)
     z_term *= var_params.z
 
