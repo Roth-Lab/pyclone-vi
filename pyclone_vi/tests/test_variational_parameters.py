@@ -75,20 +75,12 @@ def update_theta(log_p_data, priors, var_params):
 
 
 class TestVariationalParameterUpdates(unittest.TestCase):
-    def __init__(self, method_name: str = ...):
-        super().__init__(method_name)
-
-        self.default_grid_size = 100
-
-        self.rng_seed = 242643578967193853558243570818064774262
-
-        self.rng = None
-
-        self.num_threads = 10
-
-        set_num_threads(self.num_threads)
 
     def setUp(self) -> None:
+        self.default_grid_size = 100
+        self.rng_seed = 242643578967193853558243570818064774262
+        self.num_threads = 10
+        set_num_threads(self.num_threads)
         self.rng = np.random.default_rng(self.rng_seed)
 
     def create_log_p_data(self, depth, num_data_points, num_dims, num_grid_points):
@@ -103,7 +95,7 @@ class TestVariationalParameterUpdates(unittest.TestCase):
         return log_p_data
 
     def create_test_structures_big(self):
-        num_clusters = 20
+        num_clusters = 40
         num_data_points = 1000
         num_dims = 100
         num_grid_points = self.default_grid_size
@@ -156,7 +148,7 @@ class TestVariationalParameterUpdates(unittest.TestCase):
         with threadpool_limits(limits=self.num_threads, user_api="blas"):
             actual_var_params.update_pi(priors)
 
-        np.testing.assert_array_almost_equal(expected_var_params.pi, actual_var_params.pi)
+        np.testing.assert_allclose(actual_var_params.pi, expected_var_params.pi)
 
     def test_update_z_small(self):
         log_p_data, actual_var_params, priors, expected_var_params = self.create_test_structures_small()
@@ -168,7 +160,7 @@ class TestVariationalParameterUpdates(unittest.TestCase):
         with threadpool_limits(limits=self.num_threads, user_api="blas"):
             actual_var_params.update_z(data_preproc)
 
-        np.testing.assert_array_almost_equal(expected_var_params.z, actual_var_params.z)
+        np.testing.assert_allclose(actual_var_params.z, expected_var_params.z)
 
     def test_update_theta_small(self):
         log_p_data, actual_var_params, priors, expected_var_params = self.create_test_structures_small()
@@ -180,7 +172,7 @@ class TestVariationalParameterUpdates(unittest.TestCase):
         with threadpool_limits(limits=self.num_threads, user_api="blas"):
             actual_var_params.update_theta(priors, data_preproc)
 
-        np.testing.assert_array_almost_equal(expected_var_params.theta, actual_var_params.theta)
+        np.testing.assert_allclose(actual_var_params.theta, expected_var_params.theta)
 
 
 if __name__ == "__main__":

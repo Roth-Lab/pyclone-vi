@@ -53,18 +53,11 @@ def compute_log_p_data_theta(log_p_data, theta):
 
 
 class TestComputeELogQ(unittest.TestCase):
-    def __init__(self, method_name: str = ...):
-        super().__init__(method_name)
-
-        self.default_grid_size = 100
-
-        self.rng_seed = 242643578967193853558243570818064774262
-
-        self.rng = None
-
-        self.eps = 1e-6
 
     def setUp(self) -> None:
+        self.default_grid_size = 100
+        self.rng_seed = 242643578967193853558243570818064774262
+        self.eps = 1e-6
         self.rng = np.random.default_rng(self.rng_seed)
 
     def run_test(self, num_clusters, num_data_points, num_dims, num_grid_points):
@@ -93,18 +86,11 @@ class TestComputeELogQ(unittest.TestCase):
 
 
 class TestComputeELogP(unittest.TestCase):
-    def __init__(self, method_name: str = ...):
-        super().__init__(method_name)
-
-        self.default_grid_size = 100
-
-        self.rng_seed = 242643578967193853558243570818064774262
-
-        self.rng = None
-
-        set_num_threads(10)
 
     def setUp(self) -> None:
+        self.default_grid_size = 100
+        self.rng_seed = 242643578967193853558243570818064774262
+        set_num_threads(10)
         self.rng = np.random.default_rng(self.rng_seed)
 
     def run_test(self, num_clusters, num_data_points, num_dims, num_grid_points, log_p_data):

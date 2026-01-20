@@ -8,20 +8,12 @@ import pandas as pd
 
 
 class TestMonotonicallyIncreasingELBO(unittest.TestCase):
-    def __init__(self, method_name: str = ...):
-        super().__init__(method_name)
-
-        self.default_grid_size = 100
-
-        self.rng_seed = 242643578967193853558243570818064774262
-
-        self.rng = None
-
-        self.num_threads = 10
-
-        set_num_threads(self.num_threads)
 
     def setUp(self) -> None:
+        self.default_grid_size = 100
+        self.rng_seed = 242643578967193853558243570818064774262
+        self.num_threads = 10
+        set_num_threads(self.num_threads)
         self.rng = np.random.default_rng(self.rng_seed)
 
     def create_log_p_data(self, depth, num_data_points, num_dims, num_grid_points):
