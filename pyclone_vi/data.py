@@ -1,13 +1,15 @@
 from collections import OrderedDict
+from numba import njit, int64, float64
+from numba.typed import List
 
-import numba
+from numba.experimental import jitclass
 import numpy as np
 import pandas as pd
+import click
 
 from pyclone_vi.math_utils import (
     log_beta_binomial_pdf,
     log_binomial_pdf,
-    log_normalize,
     log_sum_exp,
 )
 
@@ -15,96 +17,141 @@ from functools import lru_cache
 
 
 def load_data(file_name, density="binomial", num_grid_points=100, precision=200):
-    data, mutations, samples = load_pyclone_data(file_name)
 
-    log_p_data = []
+    click.echo("Parsing Input Data...\n")
 
-    for data_point in data.values():
-        log_p_data.append(
-            data_point.to_likelihood_grid(density, num_grid_points, precision=precision)
-        )
+    data, samples = load_pyclone_data(file_name)
 
-    return np.stack(log_p_data), mutations, samples
+    mutations = data.index.to_list()
+
+    log_p_data = data.apply(dp_likelihood_grid, args=(density, num_grid_points, precision))
+
+    log_p_data = log_p_data.to_numpy(dtype=np.dtype((np.float64, (len(samples), num_grid_points))))
+
+    click.echo("#" * 100)
+    click.echo()
+
+    log_p_data.setflags(write=False)
+
+    return log_p_data, mutations, samples
+
+
+def dp_likelihood_grid(dp, density, num_grid_points, precision):
+    return dp.to_likelihood_grid(density, num_grid_points, precision=precision)
 
 
 def load_pyclone_data(file_name):
     df = pd.read_csv(file_name, sep="\t")
+    df = df.drop_duplicates()
 
     df = _remove_cn_zero_mutations(df)
 
     _process_required_columns(df)
 
     samples = sorted(df["sample_id"].unique())
-    samples_len = len(samples)
 
-    # Filter for mutations present in all samples
-    df = df.loc[df.groupby("mutation_id")["sample_id"].transform("size") == samples_len]
+    df = _remove_duplicated_and_partially_absent_mutations(df, samples)
 
     data = _create_loaded_pyclone_data_dict(df, samples)
 
     get_major_cn_prior.cache_clear()
 
-    print("Num Samples: {}".format(len(samples)))
-    if len(samples) > 20:
-        print("Samples: {}...".format(" ".join(samples[:10])))
+    click.echo("Num Mutations: {}".format(len(data)))
+    click.echo("Num Samples: {}".format(len(samples)))
+    if len(samples) > 6:
+        click.echo("Samples: {}...".format(", ".join(samples[:5])))
     else:
-        print("Samples: {}".format(" ".join(samples)))
+        click.echo("Samples: {}".format(", ".join(samples)))
 
-    print("Num mutations: {}".format(len(data)))
+    click.echo()
 
-    return data, list(data.keys()), samples
+    return data, samples
 
 
 def _create_loaded_pyclone_data_dict(df, samples):
-    data = OrderedDict()
-    df = df.sort_values(by="mutation_id", ascending=True)
-    grouped = df.groupby("mutation_id", sort=False)
+    samples = pd.Index(samples, name="sample_id", dtype=df["sample_id"].dtype)
+    df.set_index("sample_id", inplace=True)
+    df.sort_index(inplace=True)
+    grouped = df.groupby("mutation_id", sort=True)
 
-    for mutation, group in grouped:
-        sample_data_points = []
-
-        group.set_index("sample_id", inplace=True)
-
-        for sample in samples:
-
-            a = group.at[sample, "ref_counts"]
-
-            b = group.at[sample, "alt_counts"]
-
-            cn, mu, log_pi = get_major_cn_prior(
-                group.at[sample, "major_cn"],
-                group.at[sample, "minor_cn"],
-                group.at[sample, "normal_cn"],
-                error_rate=group.at[sample, "error_rate"],
-            )
-
-            sample_data_points.append(
-                SampleDataPoint(
-                    a, b, cn, mu, log_pi, group.at[sample, "tumour_content"]
-                )
-            )
-
-        data[mutation] = DataPoint(samples, sample_data_points)
+    data = grouped.apply(make_datapoint_from_group, samples=samples, include_groups=False)
 
     return data
+
+
+def make_datapoint_from_group(group, samples):
+    sample_dp_df = group.agg(create_sample_data_point, axis=1)
+    return DataPoint(samples, sample_dp_df)
+
+
+def create_sample_data_point(row_series):
+    major_cn = int(row_series["major_cn"])
+    minor_cn = row_series["minor_cn"]
+    normal_cn = row_series["normal_cn"]
+    error_rate = row_series["error_rate"]
+    ref_count = row_series["ref_counts"]
+    alt_count = row_series["alt_counts"]
+    tumour_content = row_series["tumour_content"]
+
+    cn, mu, log_pi = get_major_cn_prior(
+        major_cn,
+        minor_cn,
+        normal_cn,
+        error_rate,
+    )
+
+    sample_dp = SampleDataPoint(ref_count, alt_count, cn, mu, log_pi, tumour_content)
+
+    return sample_dp
 
 
 def _process_required_columns(df):
     df["sample_id"] = df["sample_id"].astype(str)
     if "error_rate" not in df.columns:
-        df.loc[:, "error_rate"] = 1e-3
-    if "tumour_content" not in df.columns:
-        print("Tumour content column not found. Setting values to 1.0.")
+        click.echo("Error rate column not found, setting values to {}.\n".format(1e-3))
+        df["error_rate"] = 1e-3
 
-        df.loc[:, "tumour_content"] = 1.0
-    print()
+    if "tumour_content" not in df.columns:
+        click.echo("Tumour content column not found, setting values to 1.0.\n")
+        df["tumour_content"] = 1.0
 
 
 def _remove_cn_zero_mutations(df):
-    num_dels = sum(df["major_cn"] == 0)
+    num_dels = len(df.loc[df["major_cn"] == 0])
     if num_dels > 0:
-        print("Removing {} mutations with major copy number zero".format(num_dels))
+        click.echo("Removing {} mutations with major copy number zero".format(num_dels))
     df = df.loc[df["major_cn"] > 0]
+    return df
+
+
+def _remove_duplicated_and_partially_absent_mutations(df, samples):
+    samples_len = len(samples)
+    group_transform = df.groupby("mutation_id")["sample_id"].transform("size")
+    num_not_present_in_all = len(df.loc[group_transform < samples_len]["mutation_id"].unique())
+    num_duplicates = len(df.loc[group_transform > samples_len]["mutation_id"].unique())
+    if num_duplicates > 0:
+        if num_duplicates == 1:
+            pl = ""
+        else:
+            pl = "s"
+        click.echo("Removing {} duplicate mutation ID{}".format(num_duplicates, pl))
+    if num_not_present_in_all > 0:
+        if num_not_present_in_all == 1:
+            pl = ("", "is")
+        else:
+            pl = ("s", "are")
+        click.echo(
+            "Removing {} mutation{} that {} not present in all samples".format(
+                num_not_present_in_all,
+                pl[0],
+                pl[1],
+            )
+        )
+    df = df.loc[group_transform == samples_len]
+
+    if (num_duplicates > 0) or (num_not_present_in_all > 0):
+        click.echo()
+
     return df
 
 
@@ -112,80 +159,74 @@ def _remove_cn_zero_mutations(df):
 def get_major_cn_prior(major_cn, minor_cn, normal_cn, error_rate=1e-3):
     total_cn = major_cn + minor_cn
 
-    cn = []
-
-    mu = []
-
-    log_pi = []
-
     # Consider all possible mutational genotypes consistent with mutation before CN change
-    for x in range(1, major_cn + 1):
-        cn.append((normal_cn, normal_cn, total_cn))
-
-        mu.append((error_rate, error_rate, min(1 - error_rate, x / total_cn)))
-
-        log_pi.append(0)
+    cn = [(normal_cn, normal_cn, total_cn) for _ in range(1, major_cn + 1)]
+    mu = [(error_rate, error_rate, min(1 - error_rate, x / total_cn)) for x in range(1, major_cn + 1)]
 
     # Consider mutational genotype of mutation before CN change if not already added
-    mutation_after_cn = (normal_cn, total_cn, total_cn)
-
-    if mutation_after_cn not in cn:
+    if total_cn != normal_cn:
+        mutation_after_cn = (normal_cn, total_cn, total_cn)
         cn.append(mutation_after_cn)
-
         mu.append((error_rate, error_rate, min(1 - error_rate, 1 / total_cn)))
-
-        log_pi.append(0)
-
         assert len(set(cn)) == 2
 
-    cn = np.array(cn, dtype=int)
+    cn = np.array(cn, dtype=np.int64)
+    mu = np.array(mu, dtype=np.float64)
 
-    mu = np.array(mu, dtype=float)
+    log_pi_val = -np.log(len(cn))
+    log_pi = np.full(len(cn), log_pi_val)
 
-    log_pi = log_normalize(np.array(log_pi, dtype=float))
+    cn.setflags(write=False)
+    mu.setflags(write=False)
+    log_pi.setflags(write=False)
 
     return cn, mu, log_pi
 
 
 class DataPoint(object):
+    __slots__ = "samples", "sample_data_points"
+
     def __init__(self, samples, sample_data_points):
         self.samples = samples
-
         self.sample_data_points = sample_data_points
 
-    def get_ccf_grid(self, grid_size, eps=1e-6):
+        if not samples.equals(sample_data_points.index):
+            self.sample_data_points.sort_index(inplace=True)
+            assert samples.equals(sample_data_points.index)
+
+    @staticmethod
+    def get_ccf_grid(grid_size, eps=1e-6):
         return np.linspace(eps, 1 - eps, grid_size)
 
     def to_dict(self):
-        return OrderedDict(zip(self.samples, self.sample_data_points))
+        return self.sample_data_points.to_dict(into=OrderedDict)
 
     def to_likelihood_grid(self, density, num_grid_points, precision=200):
+        ccf_grid = self.get_ccf_grid(num_grid_points)
+
         shape = (len(self.samples), num_grid_points)
 
-        log_ll = np.zeros(shape)
+        log_ll = np.empty(shape, dtype=np.float64, order="C")
+        sample_data_points = self.sample_data_points
 
-        grid = self.get_ccf_grid(num_grid_points)
-
-        for s_idx, data_point in enumerate(self.sample_data_points):
-            if density == "beta-binomial":
-                log_ll[s_idx] = log_pyclone_beta_binomial_pdf_grid(
-                    data_point, grid, precision
-                )
-
-            elif density == "binomial":
-                log_ll[s_idx] = log_pyclone_binomial_pdf_grid(data_point, grid)
+        if density == "beta-binomial":
+            _compute_beta_binomial_likelihood_grid(ccf_grid, log_ll, precision, List(sample_data_points))
+        elif density == "binomial":
+            _compute_binomial_likelihood_grid(ccf_grid, log_ll, List(sample_data_points))
+        else:
+            raise NotImplemented("Unknown density: {}".format(density))
 
         return log_ll
 
 
-@numba.experimental.jitclass(
+@jitclass(
     [
-        ("a", numba.int64),
-        ("b", numba.int64),
-        ("cn", numba.int64[:, :]),
-        ("mu", numba.float64[:, :]),
-        ("log_pi", numba.float64[:]),
-        ("t", numba.float64),
+        ("a", int64),
+        ("b", int64),
+        ("cn", int64[:, :]),
+        ("mu", float64[:, :]),
+        ("log_pi", float64[:]),
+        ("t", float64),
     ]
 )
 class SampleDataPoint(object):
@@ -198,27 +239,21 @@ class SampleDataPoint(object):
         self.t = t
 
 
-@numba.njit
-def log_pyclone_beta_binomial_pdf_grid(data_point, grid, precision):
-    log_ll = np.zeros(grid.shape)
-
-    for i, ccf in enumerate(grid):
-        log_ll[i] = log_pyclone_beta_binomial_pdf(data_point, ccf, precision)
-
-    return log_ll
+@njit
+def _compute_binomial_likelihood_grid(ccf_grid, log_ll, sample_data_points):
+    for s_idx, data_point in enumerate(sample_data_points):
+        for i, ccf in enumerate(ccf_grid):
+            log_ll[s_idx, i] = log_pyclone_binomial_pdf(data_point, ccf)
 
 
-@numba.njit
-def log_pyclone_binomial_pdf_grid(data_point, grid):
-    log_ll = np.zeros(grid.shape)
-
-    for i, ccf in enumerate(grid):
-        log_ll[i] = log_pyclone_binomial_pdf(data_point, ccf)
-
-    return log_ll
+@njit
+def _compute_beta_binomial_likelihood_grid(ccf_grid, log_ll, precision, sample_data_points):
+    for s_idx, data_point in enumerate(sample_data_points):
+        for i, ccf in enumerate(ccf_grid):
+            log_ll[s_idx, i] = log_pyclone_beta_binomial_pdf(data_point, ccf, precision)
 
 
-@numba.njit
+@njit
 def log_pyclone_beta_binomial_pdf(data, f, s):
     t = data.t
 
@@ -229,7 +264,7 @@ def log_pyclone_beta_binomial_pdf(data, f, s):
     population_prior[1] = t * (1 - f)
     population_prior[2] = t * f
 
-    ll = np.ones(C, dtype=np.float64) * np.inf * -1
+    ll = np.full(C, -np.inf, dtype=np.float64)
 
     for c in range(C):
         e_vaf = 0
@@ -254,7 +289,7 @@ def log_pyclone_beta_binomial_pdf(data, f, s):
     return log_sum_exp(ll)
 
 
-@numba.njit
+@njit
 def log_pyclone_binomial_pdf(data, f):
     t = data.t
 
@@ -265,7 +300,7 @@ def log_pyclone_binomial_pdf(data, f):
     population_prior[1] = t * (1 - f)
     population_prior[2] = t * f
 
-    ll = np.ones(C, dtype=np.float64) * np.inf * -1
+    ll = np.full(C, -np.inf, dtype=np.float64)
 
     for c in range(C):
         e_vaf = 0

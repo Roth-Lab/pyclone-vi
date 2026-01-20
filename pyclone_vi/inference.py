@@ -1,76 +1,42 @@
-from scipy.special import gammaln as log_gamma, logsumexp as log_sum_exp, psi
-
-from numba import njit, prange
+from __future__ import annotations
+from scipy.special import gammaln as log_gamma, logsumexp, psi
 import numpy as np
+import click
 
 
-def fit_annealed(
-    log_p_data,
-    priors,
-    var_params,
-    annealing_power=1.0,
-    convergence_threshold=1e-6,
-    max_iters=int(1e4),
-    num_annealing_steps=10,
-    print_freq=100,
-):
-    if num_annealing_steps == 1:
-        annealing_ladder = [1.0]
-
-    else:
-        annealing_ladder = np.linspace(0, 1.0, num_annealing_steps) ** annealing_power
-
-    for t in annealing_ladder:
-        print("Setting annealing factor to : {}".format(t))
-        print()
-
-        log_p_data_annealed = t * log_p_data
-
-        if t == 1.0:
-            convergence_threshold_t = convergence_threshold
-
-        else:
-            convergence_threshold_t = convergence_threshold * 1e-2
-
-        elbo_trace = fit(
-            log_p_data_annealed,
-            priors,
-            var_params,
-            convergence_threshold=convergence_threshold_t,
-            max_iters=max_iters,
-            print_freq=print_freq,
-        )
-
-    return elbo_trace
-
-
-def fit(
-    log_p_data,
-    priors,
-    var_params,
+def fit_pyclone_model(
+    priors: Priors,
+    var_params: VariationalParameters,
+    data_preproc: DataPreprocessor,
     convergence_threshold=1e-6,
     max_iters=int(1e4),
     print_freq=100,
 ):
-    elbo_trace = [compute_elbo(log_p_data, priors, var_params)]
+
+    eps = 1e-6
+    elbo_trace = [compute_elbo(priors, var_params, data_preproc, eps)]
 
     for i in range(max_iters):
         if i % print_freq == 0:
             num_clusters = len(set(var_params.z.argmax(axis=1)))
-            print("Iteration: {}".format(i))
-            print("ELBO: {}".format(elbo_trace[-1]))
-            print("Number of clusters used: {}".format(num_clusters))
-            print()
+            click.echo("Iteration: {}".format(i))
+            click.echo("ELBO: {}".format(elbo_trace[-1]))
+            click.echo("Number of clusters used: {}".format(num_clusters))
+            click.echo()
 
-        update_z(log_p_data, var_params)
+        var_params.update_z(data_preproc)
 
-        update_pi(priors, var_params)
+        var_params.update_pi(priors)
 
-        update_theta(log_p_data, priors, var_params)
+        var_params.update_theta(priors, data_preproc)
 
-        elbo_trace.append(compute_elbo(log_p_data, priors, var_params))
+        curr_elbo = compute_elbo(priors, var_params, data_preproc, eps)
 
-        diff = (elbo_trace[-1] - elbo_trace[-2]) / np.abs(elbo_trace[-1])
+        prev_elbo = elbo_trace[-1]
+
+        elbo_trace.append(curr_elbo)
+
+        diff = (curr_elbo - prev_elbo) / np.abs(curr_elbo)
 
         if diff < convergence_threshold:
             break
@@ -78,140 +44,165 @@ def fit(
     return elbo_trace
 
 
-def get_priors(num_clusters, num_grid_points):
-    return Priors(
-        np.ones(num_clusters), (1 / num_grid_points) * np.ones(num_grid_points)
-    )
+class DataPreprocessor(object):
+    __slots__ = "theta_update_data", "z_update_data", "theta_update_shape", "z_update_shape"
 
+    def __init__(self, log_p_data: np.ndarray):
+        self.theta_update_data = self._reshape_data_for_inference(log_p_data, [0, 1, 2])
+        self.z_update_data = self._reshape_data_for_inference(log_p_data, [0, 2, 1])
 
-def get_variational_params(
-    num_clusters, num_data_points, num_dims, num_grid_points, rng
-):
-    var_params = VariationalParameters(
-        rng.dirichlet(np.ones(num_clusters)),
-        rng.gamma(1, 1, size=(num_clusters, num_dims, num_grid_points)),
-        rng.dirichlet(np.ones(num_clusters), size=num_data_points),
-    )
+        self.theta_update_shape = log_p_data.shape[1], log_p_data.shape[2]
 
-    var_params.theta = (
-        var_params.theta / np.sum(var_params.theta, axis=2)[:, :, np.newaxis]
-    )
+        self.z_update_shape = log_p_data.shape[0]
 
-    return var_params
+    @staticmethod
+    def _reshape_data_for_inference(log_p_data: np.ndarray, axis_order: list[int]) -> np.ndarray:
+        new_axes_order = axis_order
+        contraction_axis_size = log_p_data.shape[2] * log_p_data.shape[1]
+        new_shape = [log_p_data.shape[0], contraction_axis_size]
+        reshaped_data_arr = log_p_data.transpose(new_axes_order).reshape(new_shape)
+        reshaped_data_arr.setflags(write=False)
+        return reshaped_data_arr
 
 
 class Priors(object):
-    def __init__(self, pi, theta):
-        self.pi = pi
+    __slots__ = "pi", "theta", "log_theta", "pi_log_gamma"
 
-        self.theta = theta
+    def __init__(self, num_clusters: int, num_grid_points: int, mix_weight_prior: float):
+        self.pi = np.full(num_clusters, mix_weight_prior, dtype=np.float64, order="C")
+
+        theta_fill_val = 1 / num_grid_points
+        self.theta = np.full(num_grid_points, theta_fill_val, dtype=np.float64, order="C")
+
+        self.log_theta = np.log(self.theta)
+
+        self.pi_log_gamma = log_gamma(self.pi.sum()) - log_gamma(self.pi).sum()
+
+        self._make_prior_arrays_read_only()
+
+    def _make_prior_arrays_read_only(self):
+        self.pi.setflags(write=False)
+        self.theta.setflags(write=False)
+        self.log_theta.setflags(write=False)
 
 
 class VariationalParameters(object):
-    def __init__(self, pi, theta, z):
-        self.pi = pi
+    __slots__ = "pi", "theta", "z"
 
-        self.theta = theta
+    def __init__(
+        self,
+        num_clusters: int,
+        num_data_points: int,
+        num_dims: int,
+        num_grid_points: int,
+        rng: np.random.Generator,
+    ):
+        ones_arr = np.ones(num_clusters)
 
-        self.z = z
+        self.pi = rng.dirichlet(ones_arr)
+
+        self.theta = self._draw_initial_theta_value(num_clusters, num_dims, num_grid_points, rng)
+
+        self.z = rng.dirichlet(ones_arr, size=num_data_points)
+
+    @staticmethod
+    def _draw_initial_theta_value(num_clusters: int, num_dims: int, num_grid_points: int, rng: np.random.Generator):
+        pre_theta = rng.gamma(1, 1, size=(num_clusters, num_dims, num_grid_points))
+        pre_theta /= pre_theta.sum(axis=2, keepdims=True)
+        return pre_theta
+
+    def update_pi(self, priors: Priors):
+        self.pi = np.add(priors.pi, self.z.sum(axis=0), out=self.pi)
+
+    def update_z(self, data_preproc: DataPreprocessor):
+        new_z = get_log_p_data_theta(self.theta, data_preproc)
+
+        psi_term = psi(self.pi)
+        psi_term -= psi(self.pi.sum())
+
+        new_z += psi_term
+
+        new_z -= logsumexp(new_z, axis=1, keepdims=True)
+
+        self.z = np.exp(new_z, order="C", out=self.z)
+
+    def update_theta(self, priors: Priors, data_preproc: DataPreprocessor):
+
+        reshaped_z = self.z.transpose([1, 0]).reshape(self.z.shape[1], self.z.shape[0])
+        log_p_data_z = np.dot(reshaped_z, data_preproc.theta_update_data)
+        log_p_data_z = log_p_data_z.reshape(self.z.shape[1], *data_preproc.theta_update_shape)
+
+        log_p_data_z += priors.log_theta
+
+        log_p_data_z -= logsumexp(log_p_data_z, axis=2, keepdims=True)
+        self.theta = np.exp(log_p_data_z, order="C", out=self.theta)
 
 
-def compute_elbo(log_p_data, priors, var_params):
-    return compute_e_log_p(log_p_data, priors, var_params) - compute_e_log_q(var_params)
+def compute_elbo(priors: Priors, var_params: VariationalParameters, data_preproc: DataPreprocessor, eps: float):
+    return compute_e_log_p(priors, var_params, data_preproc) - compute_e_log_q(var_params, eps)
 
 
-def compute_e_log_p(log_p_data, priors, var_params):
-    log_p = 0
+def compute_e_log_p(priors: Priors, var_params: VariationalParameters, data_preproc: DataPreprocessor):
+    log_p = priors.pi_log_gamma
 
-    log_p += log_gamma(np.sum(priors.pi)) - np.sum(log_gamma(priors.pi))
+    p_pi_z_term = priors.pi + var_params.z.sum(axis=0)
+    p_pi_z_term -= 1
 
-    log_p += np.sum(
-        (priors.pi + np.sum(var_params.z, axis=0) - 1)
-        * (psi(var_params.pi) - psi(np.sum(var_params.pi)))
-    )
+    pi_psi_term = psi(var_params.pi)
+    pi_psi_term -= psi(var_params.pi.sum())
+    pi_psi_term *= p_pi_z_term
+    pi_psi_term = np.asarray(pi_psi_term)
 
-    log_p += np.sum(var_params.theta * np.log(priors.theta)[np.newaxis, np.newaxis, :])
+    log_p += pi_psi_term.sum()
 
-    log_p += np.sum(
-        var_params.z * compute_log_p_data_theta(log_p_data, var_params.theta)
-    )
+    log_p += (var_params.theta * priors.log_theta).sum()
+
+    log_p_data_theta = get_log_p_data_theta(var_params.theta, data_preproc)
+
+    log_p_data_theta *= var_params.z
+
+    log_p += log_p_data_theta.sum()
 
     return log_p
 
 
-def compute_e_log_q(var_params):
-    log_p = 0
+def get_log_p_data_theta(theta: np.ndarray, data_preproc: DataPreprocessor):
 
-    log_p += log_gamma(np.sum(var_params.pi)) - np.sum(log_gamma(var_params.pi))
+    new_axes_order = [2, 1, 0]
+    contraction_axis_size = theta.shape[2] * theta.shape[1]
+    new_theta_shape = [contraction_axis_size, theta.shape[0]]
+    reshaped_theta_arr = theta.transpose(new_axes_order).reshape(new_theta_shape)
 
-    log_p += np.sum(
-        (var_params.pi - 1) * (psi(var_params.pi) - psi(np.sum(var_params.pi)))
-    )
+    log_p_data_theta = np.dot(data_preproc.z_update_data, reshaped_theta_arr)
+    log_p_data_theta = log_p_data_theta.reshape(data_preproc.z_update_shape, theta.shape[0])
 
-    log_p += np.sum(var_params.theta * np.log(var_params.theta + 1e-6))
+    return log_p_data_theta
 
-    log_p += np.sum(var_params.z * np.log(var_params.z + 1e-6))
+
+def compute_e_log_q(var_params: VariationalParameters, eps: float):
+    log_p = 0.0
+
+    pi_sum = var_params.pi.sum()
+
+    log_p += log_gamma(pi_sum) - log_gamma(var_params.pi).sum()
+
+    pi_psi_term = psi(var_params.pi)
+    pi_psi_term -= psi(pi_sum)
+    pi_psi_term *= var_params.pi - 1
+    pi_psi_term = np.asarray(pi_psi_term)
+
+    log_p += pi_psi_term.sum()
+
+    theta_term = var_params.theta + eps
+    theta_term = np.log(theta_term)
+    theta_term *= var_params.theta
+
+    log_p += theta_term.sum()
+
+    z_term = var_params.z + eps
+    z_term = np.log(z_term)
+    z_term *= var_params.z
+
+    log_p += z_term.sum()
 
     return log_p
-
-
-def update_pi(priors, var_params):
-    var_params.pi = priors.pi + np.sum(var_params.z, axis=0)
-
-
-def update_z(log_p_data, var_params):
-    var_params.z = compute_log_p_data_theta(log_p_data, var_params.theta)
-
-    var_params.z += (psi(var_params.pi) - psi(np.sum(var_params.pi)))[np.newaxis, :]
-
-    var_params.z = var_params.z - log_sum_exp(var_params.z, axis=1)[:, np.newaxis]
-
-    var_params.z = np.exp(var_params.z)
-
-
-def update_theta(log_p_data, priors, var_params):
-    var_params.theta = np.log(
-        priors.theta[np.newaxis, np.newaxis, :]
-    ) + compute_log_p_data_z(log_p_data, var_params.z)
-
-    var_params.theta = (
-        var_params.theta - log_sum_exp(var_params.theta, axis=2)[:, :, np.newaxis]
-    )
-
-    var_params.theta = np.exp(var_params.theta)
-
-
-@njit(parallel=True)
-def compute_log_p_data_z(log_p_data, z):
-    """Equivalent to np.sum(var_params.z[:, :, np.newaxis, np.newaxis] * log_p_data[:, np.newaxis, :, :], axis=0)"""
-    N, D, G = log_p_data.shape
-
-    K = z.shape[1]
-
-    result = np.zeros((K, D, G))
-
-    for k in prange(K):
-        for d in range(D):
-            for g in range(G):
-                for n in range(N):
-                    result[k, d, g] += log_p_data[n, d, g] * z[n, k]
-
-    return result
-
-
-@njit(parallel=True)
-def compute_log_p_data_theta(log_p_data, theta):
-    """Equivalent to np.sum(var_params.theta[np.newaxis, :, :, :] * log_p_data[:, np.newaxis, :, :], axis=(2, 3))"""
-    N, D, G = log_p_data.shape
-
-    K = theta.shape[0]
-
-    result = np.zeros((N, K))
-
-    for n in prange(N):
-        for k in range(K):
-            for d in range(D):
-                for g in range(G):
-                    result[n, k] += log_p_data[n, d, g] * theta[k, d, g]
-
-    return result

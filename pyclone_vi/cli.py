@@ -1,6 +1,28 @@
 import click
 
 import pyclone_vi.run
+import pathlib
+
+
+def _validate_out_file(ctx, param, value):
+    parent_dir = pathlib.Path(value).parent
+    checker = click.Path(exists=True, file_okay=False, dir_okay=True, writable=True)
+    checker.convert(parent_dir, param, ctx)
+    return value
+
+
+def _validate_positive_value(ctx, param, value):
+    if value < 0:
+        raise click.BadParameter("Value must be positive.")
+    return value
+
+
+def _validate_nullable_positive_value(ctx, param, value):
+    if value is None:
+        return value
+    if value < 0:
+        raise click.BadParameter("Value must be positive.")
+    return value
 
 
 @click.command(context_settings={"max_content_width": 120}, name="fit")
@@ -8,7 +30,7 @@ import pyclone_vi.run
     "-i",
     "--in-file",
     required=True,
-    type=click.Path(exists=True, resolve_path=True),
+    type=click.Path(exists=True, resolve_path=True, readable=True, file_okay=True, dir_okay=False),
     help="""Path to TSV format file with copy number and allele count information for all samples. """
     """See the examples directory in the GitHub repository for format.""",
 )
@@ -16,102 +38,97 @@ import pyclone_vi.run
     "-o",
     "--out-file",
     required=True,
-    type=click.Path(resolve_path=True),
+    type=click.Path(resolve_path=True, writable=True, file_okay=True, dir_okay=False),
+    callback=_validate_out_file,
     help="""Path to where results will be written in HDF5 format.""",
-)
-@click.option(
-    "-a",
-    "--num-annealing-steps",
-    default=1,
-    type=int,
-    help="""Number of simulated annealing steps to use. """
-    """Default is one step i.e. not to use simulated annealing.""",
 )
 @click.option(
     "-c",
     "--num-clusters",
     default=10,
-    type=int,
+    type=click.IntRange(2, clamp=True),
+    show_default=True,
     help="""Number of clusters to use in variational approximation distribution. """
-    """Note that not all clusters may not be assigned data points, so the final number of clusters could be lower. """
-    """Default is 10.""",
+    """Note that not all clusters may not be assigned data points, so the final number of clusters could be lower."""
 )
 @click.option(
     "-d",
     "--density",
     default="binomial",
     type=click.Choice(["beta-binomial", "binomial"]),
-    help="""Allele count density in the PyClone model. Use beta-binomial for high coverage sequencing. """
-    """Default binomial.""",
+    show_default=True,
+    help="""Allele count density in the PyClone model. Use beta-binomial for high coverage sequencing."""
 )
 @click.option(
     "-g",
     "--num-grid-points",
     default=100,
-    type=int,
-    help="""Number of points used to approximate CCF values. Default is 100.""",
+    type=click.IntRange(10, clamp=True),
+    show_default=True,
+    help="""Number of points used to approximate CCF values.""",
 )
 @click.option(
     "-r",
     "--num-restarts",
     default=1,
-    type=int,
-    help="""Number of random restarts of variational inference. Default is 1.""",
+    type=click.IntRange(1, clamp=True),
+    show_default=True,
+    help="""Number of random restarts of variational inference.""",
 )
 @click.option(
     "-t",
     "--num-threads",
     default=1,
-    type=int,
-    help="""Number of threads to use. Default is 1.""",
-)
-@click.option(
-    "--annealing-power",
-    default=1.0,
-    type=float,
-    help="""Exponent of entries in the annealing ladder.""" """Default is 1.0.""",
+    type=click.IntRange(1, clamp=True),
+    show_default=True,
+    help="""Number of threads to use.""",
 )
 @click.option(
     "--convergence-threshold",
     default=1e-6,
     type=float,
-    help="""Maximum relative ELBO difference between iterations to decide on convergence. """
-    """Default is 10^-6.""",
+    show_default=True,
+    callback=_validate_positive_value,
+    help="""Maximum relative ELBO difference between iterations to decide on convergence.""",
 )
 @click.option(
     "--max-iters",
     default=int(1e4),
-    type=int,
-    help="""Maximum number of ELBO optimization iterations."""
-    """Default is 10,0000.""",
+    type=click.IntRange(1, clamp=True),
+    show_default=True,
+    help="""Maximum number of ELBO optimization iterations.""",
 )
 @click.option(
     "--mix-weight-prior",
     default=1.0,
     type=float,
-    help="""Parameter value of symmetric Dirichlet prior distribution on mixture weights. Higher values will produce more clusters. """
-    """Default is 1.0 which is the uniform prior.""",
+    show_default=True,
+    callback=_validate_positive_value,
+    help="""Parameter value of symmetric Dirichlet prior distribution on mixture weights. 
+    Higher values will produce more clusters. Default is 1.0 which is the uniform prior.""",
 )
 @click.option(
     "--precision",
     default=200,
     type=float,
-    help="""Precision for Beta-Binomial density. Has no effect when using Binomial. """
-    """Default is 200.""",
+    show_default=True,
+    callback=_validate_positive_value,
+    help="""Precision for Beta-Binomial density. Has no effect when using Binomial.""",
 )
 @click.option(
     "--print-freq",
     default=100,
-    type=int,
-    help="""How often to print information about optimization. """
-    """Default is every 100 iteration.""",
+    type=click.IntRange(1, clamp=True),
+    show_default=True,
+    help="""How often to print information about optimization. Default is every 100 iterations.""",
 )
 @click.option(
     "--seed",
     default=None,
     type=int,
-    help="""Set random seed so results can be reproduced. """
-    """By default a random seed is chosen.""",
+    callback=_validate_nullable_positive_value,
+    show_default=True,
+    help="""Set random seed so results can be reproduced. By default, a random seed is chosen.""",
 )
 def fit(**kwargs):
     """Fit PyClone-VI model to data."""
@@ -123,21 +140,22 @@ def fit(**kwargs):
     "-i",
     "--in-file",
     required=True,
-    type=click.Path(exists=True, resolve_path=True),
+    type=click.Path(exists=True, resolve_path=True, readable=True, file_okay=True, dir_okay=False),
     help="""Path to HDF5 format file produced by the `fit` command.""",
 )
 @click.option(
     "-o",
     "--out-file",
     required=True,
-    type=click.Path(resolve_path=True),
+    type=click.Path(resolve_path=True, writable=True, file_okay=True, dir_okay=False),
+    callback=_validate_out_file,
     help="""Path to where results will be written in tsv format.""",
 )
 @click.option(
     "-c",
     "--compress",
     is_flag=True,
-    help="""If set the output file will be compressed using gzip.""",
+    help="""If the output file should be compressed using gzip.""",
 )
 def write_results_file(**kwargs):
     """Write the results of a fitted model to file."""

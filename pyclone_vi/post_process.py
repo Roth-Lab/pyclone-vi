@@ -5,9 +5,7 @@ import pandas as pd
 
 def fix_cluster_ids(df):
     """Renumber clusters so they are sequential from 0."""
-    cluster_map = dict(
-        zip(df["cluster_id"].unique(), np.arange(df["cluster_id"].nunique()))
-    )
+    cluster_map = dict(zip(df["cluster_id"].unique(), np.arange(df["cluster_id"].nunique())))
 
     df["cluster_id"] = df["cluster_id"].map(cluster_map)
 
@@ -61,6 +59,8 @@ def load_cluster_df(file_name):
 
             var = np.sum(x**2 * q) - mean**2
 
+            var = max(0.0, var)
+
             std = np.sqrt(var)
 
             df.append(
@@ -74,9 +74,7 @@ def load_cluster_df(file_name):
 
     df = pd.DataFrame(df)
 
-    df = df[
-        ["sample_id", "cluster_id", "cellular_prevalence", "cellular_prevalence_std"]
-    ]
+    df = df[["sample_id", "cluster_id", "cellular_prevalence", "cellular_prevalence_std"]]
 
     return df
 

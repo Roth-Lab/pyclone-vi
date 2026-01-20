@@ -1,7 +1,8 @@
-python >=3.7
-click
+python >=3.12
+click >= 8.3
 h5py >= 3
-numba
-numpy
-pandas
+numba >=0.61.2
+numpy >= 2.0
+pandas >= 2.2.2
 scipy
+threadpoolctl >= 3.6.0
